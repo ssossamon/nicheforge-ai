@@ -148,12 +148,46 @@ function scoreBandLabel(score) {
 // each its full weight from SCORE_WEIGHTS reweighted proportionally across
 // only the available components — an unavailable component's weight is
 // redistributed, never silently defaulted to a value.
-function combineWeighted(componentValues) {
+// Validates a user-supplied weights object (from Settings, sent with the
+// scan request — never trusted blindly). Any missing, non-numeric, or
+// negative field falls back to the default weight for that component;
+// Execution Fit is never user-adjustable since it's never scored. The
+// result is proportionally normalized to sum to exactly 1.0 so a user
+// fat-fingering "60, 60, 60..." doesn't silently break the math.
+function normalizeCustomWeights(rawWeights) {
+  if (!rawWeights || typeof rawWeights !== 'object') return null;
+  const adjustableKeys = ['demand', 'competitionOpportunity', 'momentum', 'gap', 'monetization', 'evidenceConfidence'];
+  // All-or-nothing: mixing a partial set of user-provided values (often on
+  // a 0-100 percentage-like scale) with default fallback values (0-0.20
+  // fractions) for the missing ones would badly skew the result toward
+  // whichever fields the user happened to provide. Safer and simpler to
+  // require a complete, valid set or fall back to full defaults.
+  const allValid = adjustableKeys.every(function (key) {
+    const v = rawWeights[key];
+    return typeof v === 'number' && isFinite(v) && v >= 0;
+  });
+  if (!allValid) return null;
+  const sum = adjustableKeys.reduce(function (a, key) { return a + rawWeights[key]; }, 0);
+  if (sum <= 0) return null;
+  const adjustableShare = 1 - SCORE_WEIGHTS.executionFit; // 0.90 by default \u2014 Execution Fit's reserved share stays reserved
+  const normalized = { executionFit: 0 };
+  adjustableKeys.forEach(function (key) { normalized[key] = rawWeights[key] / sum * adjustableShare; });
+  // The six adjustable components always share that same 90% (Execution
+  // Fit's reserved slice stays reserved, unscored, exactly as in the
+  // default weights) — a user can shift emphasis AMONG the six, not claim
+  // Execution Fit's share for something else. combineWeighted's existing
+  // reweighting then expands these back to 100% automatically, same as it
+  // already does for the default weights when Execution Fit is absent.
+  return normalized;
+}
+
+function combineWeighted(componentValues, weights) {
+  const activeWeights = weights || SCORE_WEIGHTS;
   let availableWeightSum = 0;
   const usedKeys = [];
   Object.keys(SCORE_WEIGHTS).forEach(function (key) {
     if (typeof componentValues[key] === 'number') {
-      availableWeightSum += SCORE_WEIGHTS[key];
+      availableWeightSum += activeWeights[key];
       usedKeys.push(key);
     }
   });
@@ -161,7 +195,7 @@ function combineWeighted(componentValues) {
   const reweighted = {};
   let weightedSum = 0;
   usedKeys.forEach(function (key) {
-    reweighted[key] = SCORE_WEIGHTS[key] / availableWeightSum;
+    reweighted[key] = activeWeights[key] / availableWeightSum;
     weightedSum += componentValues[key] * reweighted[key];
   });
   return { overall: Math.round(weightedSum), reweighted: reweighted, usedKeys: usedKeys };
@@ -174,13 +208,14 @@ function combineWeighted(componentValues) {
 // and band. `stage` records whether this reflects evidence-only scoring
 // (no AI ever ran — the watchlist background recheck path) or the fuller
 // AI-enriched version an interactive scan produces.
-function buildScoreBreakdown(evidence, aiScores, stage) {
+function buildScoreBreakdown(evidence, aiScores, stage, customWeights) {
   const demand = computeDemandScore(evidence);
   const competitionOpportunity = computeCompetitionOpportunityScore(evidence);
   const momentum = computeMomentumScore(evidence);
   const evidenceConfidence = computeEvidenceConfidenceScore(evidence);
   const gap = aiScores && typeof aiScores.gapScore === 'number' ? clampScore(aiScores.gapScore) : null;
   const monetization = aiScores && typeof aiScores.monetizationScore === 'number' ? clampScore(aiScores.monetizationScore) : null;
+  const activeWeights = customWeights || SCORE_WEIGHTS;
 
   const combo = combineWeighted({
     demand: demand,
@@ -190,47 +225,47 @@ function buildScoreBreakdown(evidence, aiScores, stage) {
     monetization: monetization,
     evidenceConfidence: evidenceConfidence
     // executionFit intentionally omitted: no execution-profile input exists yet.
-  });
+  }, activeWeights);
 
   const components = [
     {
       key: 'demand', label: 'Demand', value: demand, provenance: 'Computed',
-      weight: combo.reweighted.demand || 0, rawWeight: SCORE_WEIGHTS.demand,
+      weight: combo.reweighted.demand || 0, rawWeight: activeWeights.demand,
       formula: 'log10((avgViews + medianViews) / 2 + 1) \u00D7 16.67, clamped 0-100',
       inputs: { avgViews: evidence.avgViews, medianViews: evidence.medianViews }
     },
     {
       key: 'competitionOpportunity', label: 'Competition Opportunity', value: competitionOpportunity, provenance: 'Computed',
-      weight: combo.reweighted.competitionOpportunity || 0, rawWeight: SCORE_WEIGHTS.competitionOpportunity,
+      weight: combo.reweighted.competitionOpportunity || 0, rawWeight: activeWeights.competitionOpportunity,
       formula: '(1 \u2212 shareOf100k+SubChannels) \u00D7 80 + min(20, breakoutVideos \u00D7 4). Higher = less dominated by big channels.',
       inputs: { bigChannelRatio: evidence.bigChannelRatio, breakoutVideoCount: evidence.breakoutVideoCount }
     },
     {
       key: 'momentum', label: 'Momentum', value: momentum, provenance: 'Computed',
-      weight: combo.reweighted.momentum || 0, rawWeight: SCORE_WEIGHTS.momentum,
+      weight: combo.reweighted.momentum || 0, rawWeight: activeWeights.momentum,
       formula: 'freshness(0/15/30/40 by days since last upload) + cadence(uploads/week \u00D7 6, capped 30) + breakout(count \u00D7 6, capped 30)',
       inputs: { daysSinceMostRecentUpload: evidence.daysSinceMostRecentUpload, uploadsPerWeekInSample: evidence.uploadsPerWeekInSample, breakoutVideoCount: evidence.breakoutVideoCount }
     },
     {
       key: 'gap', label: 'Content Gap', value: gap, provenance: gap === null ? 'Not available' : 'AI Inference',
-      weight: combo.reweighted.gap || 0, rawWeight: SCORE_WEIGHTS.gap,
+      weight: combo.reweighted.gap || 0, rawWeight: activeWeights.gap,
       formula: gap === null ? 'Requires the AI synthesis step, which hasn\u2019t run for this evidence yet.' : 'AI-estimated 0-100: how underserved the real evidence (titles, comments, autocomplete) shows this angle to be.',
       justification: (aiScores && aiScores.gapScoreJustification) || null
     },
     {
       key: 'monetization', label: 'Monetization Potential', value: monetization, provenance: monetization === null ? 'Not available' : 'AI Inference',
-      weight: combo.reweighted.monetization || 0, rawWeight: SCORE_WEIGHTS.monetization,
+      weight: combo.reweighted.monetization || 0, rawWeight: activeWeights.monetization,
       formula: monetization === null ? 'Requires the AI synthesis step, which hasn\u2019t run for this evidence yet.' : 'AI-estimated 0-100: buyer intent and plausible offer fit implied by the real evidence \u2014 never a revenue prediction.',
       justification: (aiScores && aiScores.monetizationScoreJustification) || null
     },
     {
       key: 'executionFit', label: 'Execution Fit', value: null, provenance: 'Not scored',
-      weight: 0, rawWeight: SCORE_WEIGHTS.executionFit,
+      weight: 0, rawWeight: activeWeights.executionFit,
       formula: 'Needs your own skills/time/resources profile, which NicheForge doesn\u2019t collect yet \u2014 its 10% weight is redistributed across the other components below rather than guessed.'
     },
     {
       key: 'evidenceConfidence', label: 'Evidence Confidence', value: evidenceConfidence, provenance: 'Computed',
-      weight: combo.reweighted.evidenceConfidence || 0, rawWeight: SCORE_WEIGHTS.evidenceConfidence,
+      weight: combo.reweighted.evidenceConfidence || 0, rawWeight: activeWeights.evidenceConfidence,
       formula: 'sampleSize(videoCount/25 \u00D7 40) + completeness(channelsWithKnownSubs/uniqueChannelCount \u00D7 30) + recency(0/10/20/30 by days since last upload)',
       inputs: { videoCount: evidence.videoCount, channelsWithKnownSubs: evidence.channelsWithKnownSubs, uniqueChannelCount: evidence.uniqueChannelCount }
     }
@@ -240,7 +275,9 @@ function buildScoreBreakdown(evidence, aiScores, stage) {
     stage: stage, // 'evidence-only' (no AI ran) or 'full' (AI synthesis included)
     overall: combo.overall === null ? null : { value: combo.overall, band: scoreBandLabel(combo.overall) },
     components: components,
-    weightsNote: 'Execution Fit is unscored (no execution profile provided), so its 10% weight was redistributed proportionally across the other six components below.',
+    customWeightsApplied: !!customWeights,
+    weightsNote: (customWeights ? 'Using your custom weights (Settings \u2192 Score weights). ' : '') +
+      'Execution Fit is unscored (no execution profile provided), so its reserved share was redistributed proportionally across the other six components below.',
     computedAt: new Date().toISOString()
   };
 }
@@ -532,7 +569,10 @@ function buildSystemPrompt() {
     '"contentGap":string,"contentGapSource":"comments"|"patterns",' +
     '"monetizationAngles":[{"type":string,"description":string}],' +
     '"gapScore":number,"gapScoreJustification":string,' +
-    '"monetizationScore":number,"monetizationScoreJustification":string}. ' +
+    '"monetizationScore":number,"monetizationScoreJustification":string,' +
+    '"opportunityCards":[{"category":string,"opportunity":string,"targetSegment":string,"supportingEvidence":string,' +
+    '"competitorCoverage":string,"demandSignal":string,"expectedImpact":"low"|"medium"|"high","effort":"low"|"medium"|"high",' +
+    '"confidence":"low"|"medium"|"high","risk":string,"recommendedFormat":string,"firstValidationTest":string}]}. ' +
     'Produce between 3 and 5 items in "opportunities". "rationale" must explicitly tie back to a real number from the evidence ' +
     '(e.g. "avg views of X across the sample" or "N of the top channels have 100k+ subscribers"). ' +
     '"titleIdeas" should be inspired by the style/phrasing of the real top-performing titles provided, but must be original wording, ' +
@@ -547,7 +587,17 @@ function buildSystemPrompt() {
     'title patterns) exists for something the current top results DON\u2019T already cover well; 0 means thoroughly covered, 100 means a wide-open ' +
     'gap. "monetizationScore" (0-100) is YOUR judgment of buyer intent and offer fit implied by the evidence (do viewers/searchers show signs of ' +
     'wanting to solve a problem worth paying for?), never a revenue prediction. Both scores are explicitly your inference, not a measurement \u2014 ' +
-    'say so plainly in the one-sentence justification for each, and ground each justification in a specific piece of the evidence provided.'
+    'say so plainly in the one-sentence justification for each, and ground each justification in a specific piece of the evidence provided. ' +
+    '"opportunityCards" is a ranked list (put the strongest first) of 3-6 distinct, specific opportunities \u2014 not the same idea repeated. ' +
+    'Choose whichever categories genuinely apply from: content_gap, audience_problem_gap, product_feature_gap, offer_pricing_gap, ' +
+    'format_platform_gap, authority_proof_gap, workflow_automation_gap, education_gap \u2014 do not force all 8, only include a category if the ' +
+    'evidence actually supports it. Each card: "opportunity" is one specific, actionable idea (not a vague theme); "targetSegment" names who ' +
+    'it is for; "supportingEvidence" cites a real number or pattern from the evidence above; "competitorCoverage" states plainly how well the ' +
+    'sampled top videos already address this (e.g. "none of the top 12 cover this angle" or "covered but only by 1 of 12"); "demandSignal" ' +
+    'names which real signal supports it (comments, autocomplete, view pattern, breakout video); "expectedImpact"/"effort"/"confidence" are ' +
+    'each your honest low/medium/high judgment, not inflated toward high; "risk" names the one thing most likely to make this fail or ' +
+    'underperform; "recommendedFormat" is a concrete deliverable (e.g. "a single comparison video", "a short series", "a downloadable template"); ' +
+    '"firstValidationTest" is one specific, cheap action to test demand before committing real production time.'
   );
 }
 
@@ -678,7 +728,34 @@ async function runAiSynthesis(provider, apiKey, model, query, evidence) {
   parsed.monetizationScore = (typeof parsed.monetizationScore === 'number' && isFinite(parsed.monetizationScore)) ? Math.max(0, Math.min(100, Math.round(parsed.monetizationScore))) : null;
   if (typeof parsed.gapScoreJustification !== 'string') parsed.gapScoreJustification = null;
   if (typeof parsed.monetizationScoreJustification !== 'string') parsed.monetizationScoreJustification = null;
+  parsed.opportunityCards = validateOpportunityCards(parsed.opportunityCards);
   return parsed;
+}
+
+const VALID_GAP_CATEGORIES = ['content_gap', 'audience_problem_gap', 'product_feature_gap', 'offer_pricing_gap', 'format_platform_gap', 'authority_proof_gap', 'workflow_automation_gap', 'education_gap'];
+const VALID_LEVELS = ['low', 'medium', 'high'];
+
+function validateOpportunityCards(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(function (c) { return c && typeof c.opportunity === 'string' && c.opportunity.trim().length > 0; })
+    .slice(0, 8)
+    .map(function (c) {
+      return {
+        category: VALID_GAP_CATEGORIES.indexOf(c.category) !== -1 ? c.category : 'content_gap',
+        opportunity: c.opportunity,
+        targetSegment: typeof c.targetSegment === 'string' ? c.targetSegment : '',
+        supportingEvidence: typeof c.supportingEvidence === 'string' ? c.supportingEvidence : '',
+        competitorCoverage: typeof c.competitorCoverage === 'string' ? c.competitorCoverage : '',
+        demandSignal: typeof c.demandSignal === 'string' ? c.demandSignal : '',
+        expectedImpact: VALID_LEVELS.indexOf(c.expectedImpact) !== -1 ? c.expectedImpact : 'medium',
+        effort: VALID_LEVELS.indexOf(c.effort) !== -1 ? c.effort : 'medium',
+        confidence: VALID_LEVELS.indexOf(c.confidence) !== -1 ? c.confidence : 'medium',
+        risk: typeof c.risk === 'string' ? c.risk : '',
+        recommendedFormat: typeof c.recommendedFormat === 'string' ? c.recommendedFormat : '',
+        firstValidationTest: typeof c.firstValidationTest === 'string' ? c.firstValidationTest : ''
+      };
+    });
 }
 
 function throwOnAiError(res, provider) {
@@ -724,12 +801,13 @@ async function fetchJson(url, options) {
 // Combined single-topic pipeline: evidence + AI synthesis
 // ===========================================================================
 
-async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel) {
+async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, rawCustomWeights) {
   const evidence = await gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache);
   if (evidence.videoCount === 0) {
     return { evidence: evidence, ai: null };
   }
   const ai = await runAiSynthesis(aiProvider, aiApiKey, aiModel, query, evidence);
+  const customWeights = normalizeCustomWeights(rawCustomWeights);
 
   // Enrich the evidence-only score with the AI's Gap/Monetization judgment,
   // now that it exists. The underlying YouTube evidence may have come from
@@ -742,7 +820,7 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
     gapScoreJustification: ai.gapScoreJustification,
     monetizationScore: ai.monetizationScore,
     monetizationScoreJustification: ai.monetizationScoreJustification
-  }, 'full');
+  }, 'full', customWeights);
 
   const enrichedEvidence = Object.assign({}, evidence, {
     opportunityScore: fullBreakdown.overall.value,
@@ -807,6 +885,8 @@ module.exports = {
   saveToHistory: saveToHistory,
   gatherAutocompleteSuggestions: gatherAutocompleteSuggestions,
   buildScoreBreakdown: buildScoreBreakdown,
+  normalizeCustomWeights: normalizeCustomWeights,
+  SCORE_WEIGHTS: SCORE_WEIGHTS,
   YT_BASE: YT_BASE,
   fetchJson: fetchJson
 };

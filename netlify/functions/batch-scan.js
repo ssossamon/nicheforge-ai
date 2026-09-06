@@ -39,6 +39,7 @@ exports.handler = async function (event) {
   const aiApiKey = String(payload.aiApiKey || '').trim();
   const aiModel = payload.aiModel ? String(payload.aiModel).trim() : '';
   const clientYoutubeKey = payload.youtubeApiKey ? String(payload.youtubeApiKey).trim() : '';
+  const customWeights = (payload.scoreWeights && typeof payload.scoreWeights === 'object') ? payload.scoreWeights : null;
   const skipCache = payload.skipCache === true;
 
   if (queries.length === 0) {
@@ -104,7 +105,7 @@ exports.handler = async function (event) {
   for (let i = 0; i < queries.length; i++) {
     const q = queries[i];
     try {
-      const r = await core.runFullScan(q, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel);
+      const r = await core.runFullScan(q, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, customWeights);
       if (r.evidence.videoCount === 0) {
         results.push({
           query: q,

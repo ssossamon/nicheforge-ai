@@ -87,6 +87,10 @@
     font-family:inherit;background:#fff;color:var(--text-lo);
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .weight-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;}
+  .weight-row label{font-size:13px;margin:0;flex:1;color:var(--text-lo);}
+  .weight-row input[type=number]{width:60px;text-align:right;padding:7px 8px;border:1px solid var(--line-paper);border-radius:3px;font-size:13px;font-family:inherit;background:#fff;color:var(--text-lo);}
+  .weight-total-bad{color:var(--rust);}
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     padding:12px 18px;border-radius:3px;font-weight:600;font-size:14px;border:none;cursor:pointer;
@@ -150,6 +154,22 @@
   .tichip:hover{background:#fff;}
   .gapbox{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:14px 16px;margin-top:16px;font-size:14px;}
   .gapbox b{color:var(--brass-dim);}
+
+  /* ---- Ranked opportunity cards ---- */
+  .opp-card{background:#fff;border:1px solid var(--line-paper);border-radius:5px;padding:16px 18px;margin-bottom:14px;}
+  .opp-card-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:2px;}
+  .opp-card-rank{width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--brass);font-family:'Space Grotesk';font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px;}
+  .opp-card-category{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:var(--brass-dim);font-weight:700;margin-bottom:2px;}
+  .opp-card-title{font-size:15px;font-weight:700;color:var(--ink);line-height:1.3;}
+  .opp-card-badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px;}
+  .opp-badge{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.02em;padding:3px 8px;border-radius:3px;}
+  .opp-badge-good{background:#E9F3EC;color:#2E7D4F;}
+  .opp-badge-mid{background:#FBF3E4;color:var(--brass-dim);}
+  .opp-badge-bad{background:#F7E9E4;color:var(--rust);}
+  .opp-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 18px;font-size:12.5px;margin-bottom:10px;}
+  .opp-card-field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.03em;color:var(--muted-lo);margin-bottom:2px;font-weight:700;}
+  .opp-card-field span{color:var(--text-lo);}
+  .opp-card-validation{background:var(--paper-2);border-radius:4px;padding:9px 12px;font-size:12px;margin-top:2px;}
 
   /* ---- Transparent score breakdown drawer ---- */
   .score-drawer{border:1px solid var(--line-paper);border-radius:5px;margin-bottom:20px;overflow:hidden;}
@@ -578,6 +598,23 @@
       </div>
     </div>
 
+    <div class="field" style="margin-top:18px;border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label>Score weights (optional)</label>
+      <div class="helper">Adjust how much each factor counts toward the Opportunity Score on your niche scans. Only their relative sizes matter — they don't need to add up to any particular number. Leave at defaults if unsure.</div>
+      <div style="margin-top:12px;">
+        <div class="weight-row"><label for="w-demand">Demand (real view counts)</label><input type="number" id="w-demand" min="0" step="1" value="20" /></div>
+        <div class="weight-row"><label for="w-competition">Competition Opportunity</label><input type="number" id="w-competition" min="0" step="1" value="15" /></div>
+        <div class="weight-row"><label for="w-momentum">Momentum</label><input type="number" id="w-momentum" min="0" step="1" value="15" /></div>
+        <div class="weight-row"><label for="w-gap">Content Gap (AI judgment)</label><input type="number" id="w-gap" min="0" step="1" value="20" /></div>
+        <div class="weight-row"><label for="w-monetization">Monetization Potential (AI judgment)</label><input type="number" id="w-monetization" min="0" step="1" value="15" /></div>
+        <div class="weight-row"><label for="w-confidence">Evidence Confidence</label><input type="number" id="w-confidence" min="0" step="1" value="5" /></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+        <span class="muted-lo" style="font-size:12px;" id="weight-total-line">Total: 90</span>
+        <button class="btn btn-ghost" id="btn-reset-weights" type="button" style="padding:4px 10px;font-size:11.5px;">Reset to defaults</button>
+      </div>
+    </div>
+
     <div style="margin-top:18px;display:flex;gap:10px;">
       <button class="btn btn-primary" id="btn-save-settings" style="width:auto;flex:1;">Save settings</button>
       <button class="btn btn-ghost" id="btn-close-settings" type="button">Close</button>
@@ -780,6 +817,8 @@ function updateSettingsStatusLine() {
   line.textContent = providerLabel + ' key saved \u00B7 ' + ytPart + '.';
 }
 
+var DEFAULT_SCORE_WEIGHTS_PCT = { demand: 20, competitionOpportunity: 15, momentum: 15, gap: 20, monetization: 15, evidenceConfidence: 5 };
+
 function openSettingsModal() {
   var provider = lsGet('ai_provider');
   var aiKey = lsGet('ai_key');
@@ -789,8 +828,51 @@ function openSettingsModal() {
   if (ytKey) el('s-yt-key').value = ytKey;
   el('test-key-status').textContent = '';
   el('settings-save-status').textContent = '';
+  loadWeightInputs(getSavedScoreWeights() || DEFAULT_SCORE_WEIGHTS_PCT);
   el('settings-modal').className = 'modal-veil open';
 }
+
+function loadWeightInputs(weights) {
+  el('w-demand').value = weights.demand;
+  el('w-competition').value = weights.competitionOpportunity;
+  el('w-momentum').value = weights.momentum;
+  el('w-gap').value = weights.gap;
+  el('w-monetization').value = weights.monetization;
+  el('w-confidence').value = weights.evidenceConfidence;
+  updateWeightTotal();
+}
+
+function readWeightInputs() {
+  return {
+    demand: parseFloat(el('w-demand').value) || 0,
+    competitionOpportunity: parseFloat(el('w-competition').value) || 0,
+    momentum: parseFloat(el('w-momentum').value) || 0,
+    gap: parseFloat(el('w-gap').value) || 0,
+    monetization: parseFloat(el('w-monetization').value) || 0,
+    evidenceConfidence: parseFloat(el('w-confidence').value) || 0
+  };
+}
+
+function updateWeightTotal() {
+  var w = readWeightInputs();
+  var total = w.demand + w.competitionOpportunity + w.momentum + w.gap + w.monetization + w.evidenceConfidence;
+  var line = el('weight-total-line');
+  if (total <= 0) {
+    line.className = 'muted-lo weight-total-bad';
+    line.textContent = 'Total: 0 \u2014 set at least one above zero, or these will be ignored and defaults used.';
+  } else {
+    line.className = 'muted-lo';
+    line.textContent = 'Total: ' + total + ' (only relative size matters \u2014 Execution Fit reserves the rest, unscored)';
+  }
+}
+
+['w-demand', 'w-competition', 'w-momentum', 'w-gap', 'w-monetization', 'w-confidence'].forEach(function (id) {
+  el(id).addEventListener('input', updateWeightTotal);
+});
+
+el('btn-reset-weights').addEventListener('click', function () {
+  loadWeightInputs(DEFAULT_SCORE_WEIGHTS_PCT);
+});
 
 function closeSettingsModal() {
   el('settings-modal').className = 'modal-veil';
@@ -849,6 +931,15 @@ el('btn-save-settings').addEventListener('click', function () {
   lsSet('ai_provider', provider);
   lsSet('ai_key', aiKey);
   lsSet('youtube_key', ytKey);
+
+  var weights = readWeightInputs();
+  var weightSum = weights.demand + weights.competitionOpportunity + weights.momentum + weights.gap + weights.monetization + weights.evidenceConfidence;
+  if (weightSum > 0) {
+    lsSet('score_weights', JSON.stringify(weights));
+  } else {
+    lsSet('score_weights', '');
+  }
+
   updateSettingsStatusLine();
   statusEl.className = 'status-line status-ok';
   statusEl.textContent = 'Saved.';
@@ -1003,6 +1094,17 @@ el('btn-scan').addEventListener('click', function () {
   }
 });
 
+function getSavedScoreWeights() {
+  var raw = lsGet('score_weights');
+  if (!raw) return null;
+  try {
+    var parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function doScan(query, email) {
   var provider = lsGet('ai_provider') || 'openai';
   var apiKey = lsGet('ai_key') || '';
@@ -1027,7 +1129,8 @@ function doScan(query, email) {
       aiApiKey: apiKey,
       youtubeApiKey: youtubeKey,
       skipCache: skipCache,
-      licenseKey: lsGet('license_key') || ''
+      licenseKey: lsGet('license_key') || '',
+      scoreWeights: getSavedScoreWeights()
     })
   })
     .then(function (r) { return r.json(); })
@@ -1076,7 +1179,8 @@ function doBatchScan(topics, email) {
       aiApiKey: apiKey,
       youtubeApiKey: youtubeKey,
       skipCache: skipCache,
-      licenseKey: lsGet('license_key') || ''
+      licenseKey: lsGet('license_key') || '',
+      scoreWeights: getSavedScoreWeights()
     })
   })
     .then(function (r) { return r.json(); })
@@ -1739,6 +1843,56 @@ function buildScoreDrawerHtml(sb, idx) {
   return html;
 }
 
+var GAP_CATEGORY_LABELS = {
+  content_gap: 'Content Gap',
+  audience_problem_gap: 'Audience/Problem Gap',
+  product_feature_gap: 'Product/Feature Gap',
+  offer_pricing_gap: 'Offer/Pricing Gap',
+  format_platform_gap: 'Format/Platform Gap',
+  authority_proof_gap: 'Authority/Proof Gap',
+  workflow_automation_gap: 'Workflow/Automation Gap',
+  education_gap: 'Education Gap'
+};
+
+// goodIsHigh: true for impact/confidence (high = good, green); false for
+// effort (low = good, green, since less effort is the win).
+function levelBadgeClass(level, goodIsHigh) {
+  if (goodIsHigh) {
+    if (level === 'high') return 'opp-badge-good';
+    if (level === 'low') return 'opp-badge-bad';
+    return 'opp-badge-mid';
+  }
+  if (level === 'low') return 'opp-badge-good';
+  if (level === 'high') return 'opp-badge-bad';
+  return 'opp-badge-mid';
+}
+
+function buildOpportunityCardsHtml(cards) {
+  if (!cards || !cards.length) return '';
+  var html = '<div class="muted-lo" style="font-size:13px;margin:20px 0 10px;"><b>Ranked opportunities</b> (strongest first \u2014 impact/effort/confidence are the AI\u2019s honest judgment, not a measurement):</div>';
+  for (var i = 0; i < cards.length; i++) {
+    var c = cards[i];
+    html += '<div class="opp-card">';
+    html += '<div class="opp-card-head"><span class="opp-card-rank">' + (i + 1) + '</span><div><div class="opp-card-category">' + escapeHtml(GAP_CATEGORY_LABELS[c.category] || c.category) + '</div><div class="opp-card-title">' + escapeHtml(c.opportunity) + '</div></div></div>';
+    html += '<div class="opp-card-badges">';
+    html += '<span class="opp-badge ' + levelBadgeClass(c.expectedImpact, true) + '">Impact: ' + escapeHtml(c.expectedImpact) + '</span>';
+    html += '<span class="opp-badge ' + levelBadgeClass(c.effort, false) + '">Effort: ' + escapeHtml(c.effort) + '</span>';
+    html += '<span class="opp-badge ' + levelBadgeClass(c.confidence, true) + '">Confidence: ' + escapeHtml(c.confidence) + '</span>';
+    html += '</div>';
+    html += '<div class="opp-card-grid">';
+    if (c.targetSegment) html += '<div class="opp-card-field"><label>Target segment</label><span>' + escapeHtml(c.targetSegment) + '</span></div>';
+    if (c.recommendedFormat) html += '<div class="opp-card-field"><label>Recommended format</label><span>' + escapeHtml(c.recommendedFormat) + '</span></div>';
+    if (c.supportingEvidence) html += '<div class="opp-card-field"><label>Supporting evidence</label><span>' + escapeHtml(c.supportingEvidence) + '</span></div>';
+    if (c.demandSignal) html += '<div class="opp-card-field"><label>Demand signal</label><span>' + escapeHtml(c.demandSignal) + '</span></div>';
+    if (c.competitorCoverage) html += '<div class="opp-card-field"><label>Competitor coverage</label><span>' + escapeHtml(c.competitorCoverage) + '</span></div>';
+    if (c.risk) html += '<div class="opp-card-field"><label>Risk</label><span>' + escapeHtml(c.risk) + '</span></div>';
+    html += '</div>';
+    if (c.firstValidationTest) html += '<div class="opp-card-validation"><b style="color:var(--brass-dim);">First validation test:</b> ' + escapeHtml(c.firstValidationTest) + '</div>';
+    html += '</div>';
+  }
+  return html;
+}
+
 function buildDossierHtml(query, ev, ai, idx) {
   var html = '';
   html += '<div class="dossier">';
@@ -1811,6 +1965,8 @@ function buildDossierHtml(query, ev, ai, idx) {
       : 'Inferred from title and view patterns (no usable comments in this sample).';
     html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '<div style="font-size:12px;margin-top:6px;color:var(--brass-dim);">' + gapSourceNote + '</div></div>';
   }
+
+  html += buildOpportunityCardsHtml(ai.opportunityCards);
 
   if (ev.topComments && ev.topComments.length) {
     html += '<div class="muted-lo" style="font-size:12px;margin:14px 0 0;"><b>Real viewer comments this was grounded in</b> (from the highest-viewed videos in this sample):</div>';
@@ -2018,6 +2174,22 @@ function exportDossierToPdf(result) {
   }
   if (ai.contentGap) {
     addLine('Content gap: ' + ai.contentGap, 10, 'bold', 4);
+  }
+
+  if (ai.opportunityCards && ai.opportunityCards.length) {
+    addLine('Ranked opportunities (strongest first \u2014 impact/effort/confidence are the AI\u2019s honest judgment, not a measurement):', 12, 'bold', 8);
+    for (var oc = 0; oc < ai.opportunityCards.length; oc++) {
+      var card = ai.opportunityCards[oc];
+      addLine((oc + 1) + '. ' + card.opportunity, 11, 'bold', 2);
+      addLine('[' + (GAP_CATEGORY_LABELS[card.category] || card.category) + ']  Impact: ' + card.expectedImpact + '   Effort: ' + card.effort + '   Confidence: ' + card.confidence, 9, 'italic', 4);
+      if (card.targetSegment) addLine('Target segment: ' + card.targetSegment, 9.5, 'normal', 2);
+      if (card.supportingEvidence) addLine('Supporting evidence: ' + card.supportingEvidence, 9.5, 'normal', 2);
+      if (card.competitorCoverage) addLine('Competitor coverage: ' + card.competitorCoverage, 9.5, 'normal', 2);
+      if (card.demandSignal) addLine('Demand signal: ' + card.demandSignal, 9.5, 'normal', 2);
+      if (card.recommendedFormat) addLine('Recommended format: ' + card.recommendedFormat, 9.5, 'normal', 2);
+      if (card.risk) addLine('Risk: ' + card.risk, 9.5, 'normal', 2);
+      if (card.firstValidationTest) addLine('First validation test: ' + card.firstValidationTest, 9.5, 'normal', 8);
+    }
   }
 
   addLine('Generated by NicheForge AI on ' + new Date().toLocaleDateString(), 8, 'italic', 0);
@@ -3081,6 +3253,7 @@ function exportPlaybookToPdf(sourceLabel, result) {
   var BRASS_DIM = [140, 108, 46];
   var MOSS = [95, 169, 122];
   var RUST = [193, 97, 63];
+  var GREEN = [46, 125, 79];
   var PAPER2 = [239, 234, 219];
   var MUTED = [91, 85, 70];
   var LINE = [216, 207, 182];
@@ -3105,9 +3278,40 @@ function exportPlaybookToPdf(sourceLabel, result) {
     return doc.splitTextToSize(String(text || ''), width);
   }
 
+  // Draws a small chip at the current (x, yBaseline) matching the on-screen
+  // timestamp chip: filled navy with brass text when a real time exists (and
+  // clickable, jumping to that exact moment), or a flat gray dash otherwise.
+  // Returns the chip's width so callers can flow text after it.
+  function timestampChip(time, x, yBaseline) {
+    var hasReal = !!(time && time.display);
+    var label = hasReal ? time.display : '\u2014';
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    var textWidth = doc.getTextWidth(label);
+    var chipWidth = textWidth + 12;
+    var chipHeight = 14;
+    var chipTop = yBaseline - 10;
+    if (hasReal) {
+      doc.setFillColor(INK[0], INK[1], INK[2]);
+      doc.roundedRect(x, chipTop, chipWidth, chipHeight, 2, 2, 'F');
+      doc.setTextColor(BRASS[0], BRASS[1], BRASS[2]);
+    } else {
+      doc.setFillColor(PAPER2[0], PAPER2[1], PAPER2[2]);
+      doc.roundedRect(x, chipTop, chipWidth, chipHeight, 2, 2, 'F');
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+    }
+    doc.text(label, x + 6, yBaseline);
+    if (hasReal && time.url) {
+      doc.link(x, chipTop, chipWidth, chipHeight, { url: time.url });
+    }
+    doc.setTextColor(14, 27, 42);
+    return chipWidth;
+  }
+
   var title = result.playbook && result.playbook.title ? result.playbook.title : 'Playbook';
   var tacticCount = (result.whatTheyDid || []).length;
   var stepCount = result.playbook && result.playbook.steps ? result.playbook.steps.length : 0;
+  var chapterCount = (result.chapters || []).length;
 
   // ---- Hero header banner (full-bleed navy block) ----
   var titleLines = wrapped(title, 20, 'bold', pageWidth - 60);
@@ -3142,13 +3346,14 @@ function exportPlaybookToPdf(sourceLabel, result) {
   doc.setTextColor(BRASS[0], BRASS[1], BRASS[2]);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text(String(tacticCount), margin, statsY);
-  doc.text(String(stepCount), margin + 130, statsY);
+  var statCols = chapterCount > 0 ? [margin, margin + 100, margin + 200] : [margin, margin + 130];
+  var statVals = chapterCount > 0 ? [chapterCount, tacticCount, stepCount] : [tacticCount, stepCount];
+  var statLabels = chapterCount > 0 ? ['CHAPTERS', 'TACTICS FOUND', 'PLAYBOOK STEPS'] : ['TACTICS FOUND', 'PLAYBOOK STEPS'];
+  for (var sc = 0; sc < statVals.length; sc++) { doc.text(String(statVals[sc]), statCols[sc], statsY); }
   doc.setTextColor(190, 197, 209);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text('TACTICS FOUND', margin, statsY + 11);
-  doc.text('PLAYBOOK STEPS', margin + 130, statsY + 11);
+  for (var sl = 0; sl < statLabels.length; sl++) { doc.text(statLabels[sl], statCols[sl], statsY + 11); }
 
   y = heroHeight + 30;
   doc.setTextColor(14, 27, 42);
@@ -3168,8 +3373,220 @@ function exportPlaybookToPdf(sourceLabel, result) {
     y += 20;
   }
 
-  // ---- Section 1: tactics ----
-  sectionLabel(1, 'How did they do that?');
+  function subheading(text) {
+    checkPageBreak(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(14, 27, 42);
+    doc.text(text, margin, y);
+    y += 16;
+  }
+
+  // ---- Section 1: Transcript Intelligence (only if this dissection has it \u2014
+  // older saved playbooks from before this field existed simply skip it) ----
+  var hasTranscriptIntel = result.summary || chapterCount > 0 || (result.keyClaims && result.keyClaims.length) || (result.painPoints && result.painPoints.length);
+  if (hasTranscriptIntel) {
+    sectionLabel(1, 'Transcript Intelligence');
+
+    if (result.summary) {
+      var summaryLines = wrapped(result.summary, 10.5, 'normal', contentWidth);
+      checkPageBreak(summaryLines.length * 14 + 10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var sml2 = 0; sml2 < summaryLines.length; sml2++) { doc.text(summaryLines[sml2], margin, y); y += 14; }
+      doc.setTextColor(14, 27, 42);
+      y += 6;
+    }
+
+    if (chapterCount > 0) {
+      subheading('Chapters');
+      for (var ch = 0; ch < result.chapters.length; ch++) {
+        var chapter = result.chapters[ch];
+        var chapTitleLines = wrapped(chapter.title, 10.5, 'bold', contentWidth - 60);
+        var chapDescLines = chapter.description ? wrapped(chapter.description, 9.5, 'normal', contentWidth - 60) : [];
+        var chapHeight = Math.max(14, chapTitleLines.length * 13 + chapDescLines.length * 12 + 8);
+        checkPageBreak(chapHeight);
+        var chapTop = y;
+        timestampChip(chapter.time, margin, y);
+        var cy = y;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(14, 27, 42);
+        for (var ctl = 0; ctl < chapTitleLines.length; ctl++) { doc.text(chapTitleLines[ctl], margin + 55, cy); cy += 13; }
+        if (chapDescLines.length) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9.5);
+          doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+          for (var cdl = 0; cdl < chapDescLines.length; cdl++) { doc.text(chapDescLines[cdl], margin + 55, cy); cy += 12; }
+        }
+        doc.setTextColor(14, 27, 42);
+        y = Math.max(cy, chapTop + 14) + 8;
+        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+        doc.line(margin, y - 4, pageWidth - margin, y - 4);
+        y += 4;
+      }
+      y += 4;
+    }
+
+    if (result.keyClaims && result.keyClaims.length) {
+      subheading('Key claims');
+      for (var kc = 0; kc < result.keyClaims.length; kc++) {
+        var claim = result.keyClaims[kc];
+        var claimLines = wrapped(claim.claim, 10, 'normal', contentWidth - 60);
+        checkPageBreak(claimLines.length * 13 + 6);
+        timestampChip(claim.time, margin, y);
+        var kcy = y;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(14, 27, 42);
+        for (var kcl = 0; kcl < claimLines.length; kcl++) { doc.text(claimLines[kcl], margin + 55, kcy); kcy += 13; }
+        y = Math.max(kcy, y + 14) + 4;
+      }
+      y += 6;
+    }
+
+    if ((result.frameworksAndProcesses && result.frameworksAndProcesses.length) || (result.toolsAndResources && result.toolsAndResources.length)) {
+      var colWidth = (contentWidth - 20) / 2;
+      var leftItems = result.frameworksAndProcesses || [];
+      var rightItems = result.toolsAndResources || [];
+      var startY = y;
+      if (leftItems.length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(14, 27, 42);
+        doc.text('FRAMEWORKS & PROCESSES', margin, startY);
+      }
+      if (rightItems.length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(14, 27, 42);
+        doc.text('TOOLS & RESOURCES', margin + colWidth + 20, startY);
+      }
+      var leftY = startY + 15;
+      var rightY = startY + 15;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var li = 0; li < leftItems.length; li++) {
+        var liLines = wrapped('\u2022 ' + leftItems[li], 9.5, 'normal', colWidth);
+        for (var lil = 0; lil < liLines.length; lil++) { doc.text(liLines[lil], margin, leftY); leftY += 12; }
+      }
+      for (var ri = 0; ri < rightItems.length; ri++) {
+        var riLines = wrapped('\u2022 ' + rightItems[ri], 9.5, 'normal', colWidth);
+        for (var ril = 0; ril < riLines.length; ril++) { doc.text(riLines[ril], margin + colWidth + 20, rightY); rightY += 12; }
+      }
+      doc.setTextColor(14, 27, 42);
+      y = Math.max(leftY, rightY) + 10;
+    }
+
+    if (result.painPoints && result.painPoints.length) {
+      subheading('Audience pain points');
+      for (var pp = 0; pp < result.painPoints.length; pp++) {
+        var pain = result.painPoints[pp];
+        var painColor = pain.severity === 'high' ? RUST : pain.severity === 'low' ? GREEN : BRASS_DIM;
+        var painLines = wrapped(pain.painPoint, 10, 'normal', contentWidth - 130);
+        var segLine = pain.audienceSegment ? wrapped(pain.audienceSegment, 9, 'italic', contentWidth - 130) : [];
+        checkPageBreak((painLines.length + segLine.length) * 13 + 8);
+        doc.setFillColor(painColor[0], painColor[1], painColor[2]);
+        doc.roundedRect(margin, y - 9, 45, 13, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.text(pain.severity.toUpperCase(), margin + 22.5, y, { align: 'center' });
+        var ppy = y;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(14, 27, 42);
+        for (var ppl = 0; ppl < painLines.length; ppl++) { doc.text(painLines[ppl], margin + 55, ppy); ppy += 13; }
+        if (segLine.length) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(9);
+          doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+          for (var segl = 0; segl < segLine.length; segl++) { doc.text(segLine[segl], margin + 55, ppy); ppy += 12; }
+        }
+        timestampChip(pain.time, pageWidth - margin - 45, y);
+        doc.setTextColor(14, 27, 42);
+        y = Math.max(ppy, y + 14) + 6;
+      }
+      y += 4;
+    }
+
+    if (result.desiredOutcomes && result.desiredOutcomes.length) {
+      subheading('Desired outcomes');
+      var outcomeLines = wrapped(result.desiredOutcomes.join('  \u00B7  '), 10, 'normal', contentWidth);
+      checkPageBreak(outcomeLines.length * 13 + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var oul = 0; oul < outcomeLines.length; oul++) { doc.text(outcomeLines[oul], margin, y); y += 13; }
+      doc.setTextColor(14, 27, 42);
+      y += 6;
+    }
+
+    if (result.hookAnalysis && result.hookAnalysis.technique) {
+      subheading('Hook analysis');
+      var hookText = result.hookAnalysis.technique + ': ' + result.hookAnalysis.description;
+      var hookLines = wrapped(hookText, 10, 'normal', contentWidth - 60);
+      checkPageBreak(hookLines.length * 13 + 6);
+      timestampChip(result.hookAnalysis.time, margin, y);
+      var hy = y;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(14, 27, 42);
+      for (var hl = 0; hl < hookLines.length; hl++) {
+        if (hl === 0) {
+          doc.setFont('helvetica', 'bold');
+          doc.text(result.hookAnalysis.technique + ':', margin + 55, hy);
+          doc.setFont('helvetica', 'normal');
+        } else {
+          doc.text(hookLines[hl], margin + 55, hy);
+        }
+        hy += 13;
+      }
+      // Simpler: redraw description on its own wrapped lines beneath the technique label
+      y = hy + 4;
+      var descLines2 = wrapped(result.hookAnalysis.description, 10, 'normal', contentWidth - 20);
+      for (var dl2 = 0; dl2 < descLines2.length; dl2++) { doc.text(descLines2[dl2], margin, y); y += 13; }
+      y += 6;
+    }
+
+    if (result.persuasionDevices && result.persuasionDevices.length) {
+      subheading('Persuasion devices');
+      var persLines = wrapped(result.persuasionDevices.join('  \u00B7  '), 10, 'normal', contentWidth);
+      checkPageBreak(persLines.length * 13 + 6);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var pel = 0; pel < persLines.length; pel++) { doc.text(persLines[pel], margin, y); y += 13; }
+      doc.setTextColor(14, 27, 42);
+      y += 6;
+    }
+
+    if (result.factCheckQueue && result.factCheckQueue.length) {
+      var fcLines = [];
+      for (var fc2 = 0; fc2 < result.factCheckQueue.length; fc2++) {
+        fcLines = fcLines.concat(wrapped('\u2022 ' + result.factCheckQueue[fc2], 9.5, 'normal', contentWidth - 20));
+      }
+      var fcHeight = fcLines.length * 12 + 26;
+      checkPageBreak(fcHeight);
+      doc.setFillColor(251, 243, 228);
+      doc.setDrawColor(231, 206, 156);
+      doc.roundedRect(margin, y - 10, contentWidth, fcHeight, 3, 3, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(BRASS_DIM[0], BRASS_DIM[1], BRASS_DIM[2]);
+      doc.text('VERIFY INDEPENDENTLY BEFORE REPEATING', margin + 10, y + 4);
+      var fcy = y + 20;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var fcl = 0; fcl < fcLines.length; fcl++) { doc.text(fcLines[fcl], margin + 10, fcy); fcy += 12; }
+      doc.setTextColor(14, 27, 42);
+      y = fcy + 10;
+    }
+  }
+
+  // ---- Section 2: tactics ----
+  sectionLabel(hasTranscriptIntel ? 2 : 1, 'How did they do that?');
   for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
     var t = result.whatTheyDid[i];
     var whatLines = wrapped('What they did: ' + t.howTheyDidIt, 10, 'normal', contentWidth - 20);
@@ -3191,8 +3608,8 @@ function exportPlaybookToPdf(sourceLabel, result) {
     y += 12;
   }
 
-  // ---- Section 2: mechanic ----
-  sectionLabel(2, 'How can you do that?');
+  // ---- Section 3: mechanic ----
+  sectionLabel(hasTranscriptIntel ? 3 : 2, 'How can you do that?');
   var mechLines = wrapped(result.replicableMechanic, 10.5, 'normal', contentWidth - 32);
   var mechHeight = 34 + mechLines.length * 14;
   checkPageBreak(mechHeight);
@@ -3223,10 +3640,10 @@ function exportPlaybookToPdf(sourceLabel, result) {
     y += 8;
   }
 
-  // ---- Section 3: playbook steps ----
+  // ---- Section 4: playbook steps ----
   if (result.playbook) {
     var p = result.playbook;
-    sectionLabel(3, p.title || 'The Playbook');
+    sectionLabel(hasTranscriptIntel ? 4 : 3, p.title || 'The Playbook');
     if (p.objective) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);

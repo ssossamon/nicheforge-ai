@@ -171,6 +171,63 @@ discriminate sensibly); confirmed zero changes needed in `reports.js`,
 and remain fully compatible); full backend + frontend syntax/style/id
 validation.
 
+## v2.3 — Ranked opportunity cards (Content/Audience/Product/Offer/Format/Authority/Workflow/Education gaps)
+
+Extends the existing single `contentGap` string (kept, unchanged) with a ranked
+list of 3-8 specific opportunity cards, each categorized into one of 8 gap
+types from the original upgrade spec: content, audience/problem, product/
+feature, offer/pricing, format/platform, authority/proof, workflow/
+automation, education. Each card: opportunity, target segment, supporting
+evidence, competitor coverage, demand signal, impact/effort/confidence
+(each an honest AI judgment, never inflated), risk, recommended format, and
+a first validation test — all grounded in the same real evidence already
+gathered, no invented numbers.
+
+Learned the lesson from the earlier PDF staleness bug: built the HTML
+render and the PDF export **in the same pass** this time, rather than
+letting the PDF quietly fall behind again. Both independently verified
+with jsdom-based functional tests: correct rendering, correct category
+labels, correct badge color-coding (impact/confidence: high=green;
+effort: low=green, since less effort is the win), safe handling of empty/
+null/sparse card data, and — critically — verified the PDF export doesn't
+crash on old saved scans from before this field existed.
+
+Also unit-tested `validateOpportunityCards`'s defensive handling directly:
+malformed categories and impact/effort/confidence values safely fall back
+to sane defaults, entries missing the required `opportunity` field are
+dropped, non-array AI output returns an empty array rather than crashing,
+and the list is capped at 8 even if the AI returns more.
+
+## v2.2 — PDF export bug fix (Transcript Playbook) + adjustable score weights
+
+**Bug found and fixed**: `exportPlaybookToPdf` was never updated after v1.9
+shipped Transcript Intelligence to the HTML view — it had been silently
+stuck at the old v1.8 output (tactics/mechanic/playbook steps only) ever
+since, missing summary, chapters, key claims, frameworks, pain points,
+hook analysis, persuasion devices, and the fact-check queue entirely.
+Fixed, with real clickable YouTube timestamp links now embedded directly
+in the PDF (via jsPDF's `link()`), not just the on-screen view. Verified
+with a functional test (mocked jsPDF) across full data, pasted-transcript-
+with-no-timestamps, old pre-v1.9 saved playbooks (backward compat), and a
+20-chapter/15-step document that forces real multi-page pagination —
+confirmed `addPage()` actually fires and every real timestamp produces a
+correct link, with zero links for entries with no real timing data.
+
+**Adjustable score weights**: users can now tune how much each of the 6
+scored components (Demand/Competition Opportunity/Momentum/Gap/
+Monetization/Evidence Confidence) counts toward the Overall Opportunity
+Score, in Settings — stored in localStorage alongside the existing BYOK
+settings (no new backend store needed), sent with each scan request,
+validated server-side with `normalizeCustomWeights`. **Bug found during
+testing**: an early version merged partial user input (e.g. only one of 6
+fields set) with default *fraction*-scale fallback values on a wildly
+different numeric scale, catastrophically skewing the result toward
+whichever field happened to be provided. Fixed with all-or-nothing
+validation. Verified end-to-end with a real jsdom DOM test (not just
+backend unit tests) — opened Settings, edited values, watched the live
+total update, saved, confirmed localStorage held the right values, reset
+worked, and all-zero correctly falls back to defaults.
+
 ## v2.0 — Transcript Intelligence extended to Analyze URL (video + pasted script)
 
 v1.9 only reached the dedicated Transcript Playbook tool. Analyze URL's
