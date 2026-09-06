@@ -31,7 +31,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    const licensesStore = getStore({ name: 'nforge-licenses', consistency: 'strong' });
+    const licensesStore = getStore('nforge-licenses');
     const rec = await licensesStore.get(parsed.raw, { type: 'json' });
     if (!rec) {
       return http.json(200, { success: true, valid: false, reason: 'Key not found. Double-check it was typed correctly.' });

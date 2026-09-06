@@ -64,7 +64,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    const leadsStore = getStore({ name: 'nforge-leads', consistency: 'strong' });
+    const leadsStore = getStore('nforge-leads');
     const existing = await leadsStore.get(http.safeKey(email), { type: 'json' });
     const record = {
       email: email,

@@ -79,6 +79,29 @@ without touching Netlify's dashboard, and later lets any buyer optionally
 supply their own quota). Every scan result now labels which key served it
 ("using your own YouTube key" vs "using the app's shared YouTube key").
 
+## Known limitation: Blobs is eventually consistent
+
+All persisted data (leads, licenses, usage counts, history, watchlist, the
+scan cache) lives in Netlify Blobs, which by default takes **up to 60
+seconds** to propagate a write to all read locations (Netlify's own
+documented figure). In practice this means: add something to History or the
+Watchlist, and it may not appear in the very next request — refreshing the
+panel a little later will show it.
+
+We looked into requesting `consistency: 'strong'` for immediate read-after-
+write, but that mode requires an `uncachedEdgeURL` in the runtime context
+that `connectLambda()` (required for classic Netlify Functions) doesn't
+provide — fixing that properly would mean switching to direct
+Netlify-API-token access just for this, which is more infrastructure than
+this single-user tool needs. Eventual consistency is an accepted trade-off
+here, not a bug we missed.
+
+Separately: every Blobs-using function now calls `connectLambda(event)`
+before touching a store. Without it, Blobs silently fails with
+`MissingBlobsEnvironmentError` in production — this was broken from the
+very first deploy and is why leads/licenses may not have been saving before
+this fix.
+
 ## v1.3 — history, real comments, monetization angles, outlines, watchlist
 
 - **Scan history** (`netlify/functions/history.js`) — every successful scan is

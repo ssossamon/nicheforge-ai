@@ -31,7 +31,7 @@ exports.handler = async function (event) {
 
   let store;
   try {
-    store = getStore({ name: 'nforge-watchlist', consistency: 'strong' });
+    store = getStore('nforge-watchlist');
   } catch (e) {
     return http.fail(500, 'storage_unavailable', 'Watchlist storage is not available: ' + e.message);
   }

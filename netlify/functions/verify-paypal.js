@@ -106,7 +106,7 @@ exports.handler = async function (event) {
   // ---- 3. Issue the license key ------------------------------------------
   const key = license.generateLicenseKey(tier);
   try {
-    const licensesStore = getStore({ name: 'nforge-licenses', consistency: 'strong' });
+    const licensesStore = getStore('nforge-licenses');
     await licensesStore.setJSON(key, {
       key: key,
       tier: tier,

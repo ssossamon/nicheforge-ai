@@ -21,7 +21,7 @@ exports.handler = async function (event) {
 
   let store;
   try {
-    store = getStore({ name: 'nforge-watchlist', consistency: 'strong' });
+    store = getStore('nforge-watchlist');
   } catch (e) {
     console.log('watchlist-recheck: Blobs unavailable: ' + e.message);
     return { statusCode: 200, body: 'skipped: storage unavailable' };
