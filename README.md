@@ -113,6 +113,51 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v2.0 — Transcript Intelligence extended to Analyze URL (video + pasted script)
+
+v1.9 only reached the dedicated Transcript Playbook tool. Analyze URL's
+video and pasted-transcript/script analysis had their own, separate,
+much shallower transcript handling — `analyze-content.js` had a third
+copy of AI-provider dispatch and was still using the old flat-text
+`fetchTranscript` (no timestamps at all). Same depth now applies there
+too, not just in one tool.
+
+**Refactor first**: the real-timestamp marker system (chunk a transcript
+into ~20s windows with real `[T=M:SS]` markers, force the AI to cite one
+rather than invent a time, snap whatever it returns to the nearest real
+marker) moved out of `playbook-core.js` and into `content-analysis.js` —
+`buildMarkedTranscript`/`snapTimestamp`/`withRealTimestamp`/`noTimestamp`
+are now shared, not implemented twice. `playbook-core.js` exports
+`applyRealTimestamps` so the same field-grounding logic (chapters/
+keyClaims/painPoints/hookAnalysis) isn't a third copy in
+`analyze-content.js` either.
+
+**gatherVideoEvidence** (used only by Analyze URL) now calls
+`fetchTranscriptWithTimestamps` instead of the flat version — verified
+this was its only caller before changing the shape of `evidence.transcript`
+from a string to a `{segments, fullText}` object.
+
+**runVideoAi** (Analyze URL \u2192 paste a video URL) now builds the same
+marked transcript and asks for the same fields \u2014 summary, chapters, key
+claims, frameworks/tools, pain points, desired outcomes, hook analysis,
+persuasion devices, fact-check queue \u2014 grounded with real
+`youtube.com/watch?v=ID&t=Ns` timestamps, alongside its existing
+whatIsWorking/spinOffIdeas/monetizationAngles fields (kept, not replaced).
+When a video has no captions, these fields are explicitly told to stay
+null/empty rather than inventing transcript-derived content.
+
+**runTranscriptAi** (Analyze URL \u2192 paste a script) gets the same field
+set minus real timestamps (there's no real timing data for pasted text,
+same honesty rule as the Playbook's own pasted-transcript path), sitting
+alongside the existing scriptQualityScore/hookAssessment/structureNotes
+coaching fields.
+
+**Frontend**: both `renderVideoAnalysis` and `renderTranscriptAnalysis`
+now call the same `buildTranscriptIntelligenceHtml` component the
+Playbook uses \u2014 confirmed by inspection that none of its CSS classes
+depend on being wrapped in the Playbook's own container, so it drops
+into the existing dossier layout cleanly with no new CSS needed.
+
 ## v1.9 — Transcript Intelligence: real timestamps, not AI-guessed ones
 
 A user-supplied upgrade spec ("NicheForge AI TranscriptIQ Opportunity

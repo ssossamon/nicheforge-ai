@@ -273,7 +273,7 @@ async function gatherVideoEvidence(videoId, ytKey, ytKeySource) {
   }
 
   const topComments = await gatherTopCommentsForVideo(videoId, ytKey);
-  const transcript = await fetchTranscript(videoId);
+  const transcript = await fetchTranscriptWithTimestamps(videoId);
   const autocompleteSuggestions = await core.gatherAutocompleteSuggestions(item.snippet.title);
 
   // ---- Transparent, deterministic Video Performance Score (0-100) -------
@@ -440,6 +440,80 @@ function formatTimestamp(totalSeconds) {
   return h > 0 ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
 }
 
+// ===========================================================================
+// Real-timestamp marker system, shared by anything that reverse-engineers a
+// transcript (Transcript Playbook, and video/transcript analysis in
+// analyze-content.js). Groups real caption segments into windows tagged
+// with a real [T=M:SS] marker so the AI can cite one rather than invent a
+// time; whatever it returns is then snapped to the nearest real marker
+// before display, so a shown timestamp is always grounded in real data.
+// ===========================================================================
+
+const MARKER_WINDOW_SECONDS = 20;
+const MAX_MARKERS = 180;
+
+function buildMarkedTranscript(segments) {
+  const windows = [];
+  let currentWindowStart = 0;
+  let currentWindowText = [];
+
+  segments.forEach(function (seg) {
+    if (seg.start >= currentWindowStart + MARKER_WINDOW_SECONDS) {
+      if (currentWindowText.length > 0) {
+        windows.push({ start: currentWindowStart, text: currentWindowText.join(' ') });
+      }
+      currentWindowStart = Math.floor(seg.start / MARKER_WINDOW_SECONDS) * MARKER_WINDOW_SECONDS;
+      currentWindowText = [];
+    }
+    currentWindowText.push(seg.text);
+  });
+  if (currentWindowText.length > 0) {
+    windows.push({ start: currentWindowStart, text: currentWindowText.join(' ') });
+  }
+
+  const capped = windows.slice(0, MAX_MARKERS);
+  const marked = capped
+    .map(function (w) { return '[T=' + formatTimestamp(w.start) + '] ' + w.text; })
+    .join('\n');
+
+  return { markedText: marked.slice(0, 12000), windowStarts: capped.map(function (w) { return w.start; }) };
+}
+
+function snapTimestamp(rawTimestamp, windowStarts) {
+  if (!rawTimestamp || !windowStarts || windowStarts.length === 0) return null;
+  const match = String(rawTimestamp).match(/(?:(\d+):)?(\d+):(\d+)/);
+  if (!match) return null;
+  const h = match[1] ? parseInt(match[1], 10) : 0;
+  const m = parseInt(match[2], 10);
+  const s = parseInt(match[3], 10);
+  const totalSeconds = h * 3600 + m * 60 + s;
+
+  let nearest = windowStarts[0];
+  let smallestDiff = Math.abs(windowStarts[0] - totalSeconds);
+  for (const w of windowStarts) {
+    const diff = Math.abs(w - totalSeconds);
+    if (diff < smallestDiff) {
+      smallestDiff = diff;
+      nearest = w;
+    }
+  }
+  return nearest;
+}
+
+function withRealTimestamp(rawTimestamp, windowStarts, videoId) {
+  const realSeconds = snapTimestamp(rawTimestamp, windowStarts);
+  if (realSeconds === null) return { display: null, seconds: null, url: null };
+  return {
+    display: formatTimestamp(realSeconds),
+    seconds: realSeconds,
+    url: videoId ? 'https://www.youtube.com/watch?v=' + videoId + '&t=' + Math.floor(realSeconds) + 's' : null
+  };
+}
+
+function noTimestamp() {
+  return { display: null, seconds: null, url: null };
+}
+
 module.exports = {
   detectInputType: detectInputType,
   resolveChannelId: resolveChannelId,
@@ -447,5 +521,9 @@ module.exports = {
   gatherVideoEvidence: gatherVideoEvidence,
   fetchTranscriptWithTimestamps: fetchTranscriptWithTimestamps,
   formatTimestamp: formatTimestamp,
+  buildMarkedTranscript: buildMarkedTranscript,
+  snapTimestamp: snapTimestamp,
+  withRealTimestamp: withRealTimestamp,
+  noTimestamp: noTimestamp,
   fetchTranscript: fetchTranscript
 };

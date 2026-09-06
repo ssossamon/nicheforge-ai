@@ -1,82 +1,13 @@
-// NicheForge AI — playbook-core.js (v2.0)
+// NicheForge AI — playbook-core.js (v2.1)
 //
-// Transcript Intelligence + Playbook. Real segment timestamps (from
-// content-analysis.js's fetchTranscriptWithTimestamps) are embedded as
-// markers in the prompt; the AI must cite one of those markers rather than
-// invent a time, and every timestamp it returns is then snapped to the
-// nearest REAL segment before being shown — so a displayed "12:34" always
-// corresponds to an actual moment in the actual transcript, never a guess.
+// Transcript Intelligence + Playbook. Real segment timestamps come from
+// content-analysis.js's fetchTranscriptWithTimestamps; the marker-building/
+// timestamp-snapping mechanism itself now lives in content-analysis.js too
+// (shared with analyze-content.js's video/transcript analysis) so there's
+// exactly one implementation of "ground every timestamp in real data."
 
 const competitorCore = require('./competitor-core');
 const contentAnalysis = require('./content-analysis');
-
-const MARKER_WINDOW_SECONDS = 20; // group captions into ~20s windows for markers
-const MAX_MARKERS = 180; // keep the marked-up transcript a reasonable prompt size
-
-// ===========================================================================
-// Build a transcript with visible real-time markers the AI can cite.
-// ===========================================================================
-
-function buildMarkedTranscript(segments) {
-  const windows = [];
-  let currentWindowStart = 0;
-  let currentWindowText = [];
-
-  segments.forEach(function (seg) {
-    if (seg.start >= currentWindowStart + MARKER_WINDOW_SECONDS) {
-      if (currentWindowText.length > 0) {
-        windows.push({ start: currentWindowStart, text: currentWindowText.join(' ') });
-      }
-      currentWindowStart = Math.floor(seg.start / MARKER_WINDOW_SECONDS) * MARKER_WINDOW_SECONDS;
-      currentWindowText = [];
-    }
-    currentWindowText.push(seg.text);
-  });
-  if (currentWindowText.length > 0) {
-    windows.push({ start: currentWindowStart, text: currentWindowText.join(' ') });
-  }
-
-  const capped = windows.slice(0, MAX_MARKERS);
-  const marked = capped
-    .map(function (w) { return '[T=' + contentAnalysis.formatTimestamp(w.start) + '] ' + w.text; })
-    .join('\n');
-
-  return { markedText: marked.slice(0, 12000), windowStarts: capped.map(function (w) { return w.start; }) };
-}
-
-// Snap an AI-returned timestamp string (which might be slightly off, or in
-// the wrong format) to the nearest REAL marker time actually present in the
-// transcript, so every timestamp shown to the user is grounded in real data.
-function snapTimestamp(rawTimestamp, windowStarts) {
-  if (!rawTimestamp || !windowStarts || windowStarts.length === 0) return null;
-  const match = String(rawTimestamp).match(/(?:(\d+):)?(\d+):(\d+)/);
-  if (!match) return null;
-  const h = match[1] ? parseInt(match[1], 10) : 0;
-  const m = parseInt(match[2], 10);
-  const s = parseInt(match[3], 10);
-  const totalSeconds = h * 3600 + m * 60 + s;
-
-  let nearest = windowStarts[0];
-  let smallestDiff = Math.abs(windowStarts[0] - totalSeconds);
-  for (const w of windowStarts) {
-    const diff = Math.abs(w - totalSeconds);
-    if (diff < smallestDiff) {
-      smallestDiff = diff;
-      nearest = w;
-    }
-  }
-  return nearest;
-}
-
-function withRealTimestamp(rawTimestamp, windowStarts, videoId) {
-  const realSeconds = snapTimestamp(rawTimestamp, windowStarts);
-  if (realSeconds === null) return { display: null, seconds: null, url: null };
-  return {
-    display: contentAnalysis.formatTimestamp(realSeconds),
-    seconds: realSeconds,
-    url: videoId ? 'https://www.youtube.com/watch?v=' + videoId + '&t=' + Math.floor(realSeconds) + 's' : null
-  };
-}
 
 // ===========================================================================
 // Main dissection — Transcript Intelligence (summary/chapters/claims/pain
@@ -90,7 +21,7 @@ async function dissectTranscript(provider, apiKey, model, transcriptInput, sourc
   // video (real timestamps exist and get embedded as markers).
   let markedText, windowStarts, plainText;
   if (transcriptInput && typeof transcriptInput === 'object' && transcriptInput.segments) {
-    const built = buildMarkedTranscript(transcriptInput.segments);
+    const built = contentAnalysis.buildMarkedTranscript(transcriptInput.segments);
     markedText = built.markedText;
     windowStarts = built.windowStarts;
     plainText = transcriptInput.fullText;
@@ -160,52 +91,39 @@ async function dissectTranscript(provider, apiKey, model, transcriptInput, sourc
   if (!Array.isArray(result.playbook.successMetrics)) result.playbook.successMetrics = [];
   if (!Array.isArray(result.playbook.commonPitfalls)) result.playbook.commonPitfalls = [];
 
-  // ---- Snap every AI-cited timestamp to a real marker (or null it out) ----
-  if (hasRealTimestamps) {
-    result.chapters = result.chapters
-      .filter(function (c) { return c && typeof c.title === 'string'; })
-      .map(function (c) {
-        return { time: withRealTimestamp(c.timestamp, windowStarts, videoId), title: c.title, description: c.description || '' };
-      });
-    result.keyClaims = result.keyClaims
-      .filter(function (c) { return c && typeof c.claim === 'string'; })
-      .map(function (c) { return { claim: c.claim, time: withRealTimestamp(c.timestamp, windowStarts, videoId) }; });
-    result.painPoints = result.painPoints
-      .filter(function (p) { return p && typeof p.painPoint === 'string'; })
-      .map(function (p) {
-        return {
-          painPoint: p.painPoint,
-          severity: ['low', 'medium', 'high'].indexOf(p.severity) !== -1 ? p.severity : 'medium',
-          audienceSegment: p.audienceSegment || '',
-          time: withRealTimestamp(p.timestamp, windowStarts, videoId)
-        };
-      });
-    if (result.hookAnalysis) {
-      result.hookAnalysis.time = withRealTimestamp(result.hookAnalysis.timestamp, windowStarts, videoId);
-    }
-  } else {
-    // No real timing data (pasted transcript) — strip any timestamp the AI
-    // may have hallucinated anyway rather than showing a fake time.
-    result.chapters = result.chapters
-      .filter(function (c) { return c && typeof c.title === 'string'; })
-      .map(function (c) { return { time: { display: null, seconds: null, url: null }, title: c.title, description: c.description || '' }; });
-    result.keyClaims = result.keyClaims
-      .filter(function (c) { return c && typeof c.claim === 'string'; })
-      .map(function (c) { return { claim: c.claim, time: { display: null, seconds: null, url: null } }; });
-    result.painPoints = result.painPoints
-      .filter(function (p) { return p && typeof p.painPoint === 'string'; })
-      .map(function (p) {
-        return {
-          painPoint: p.painPoint,
-          severity: ['low', 'medium', 'high'].indexOf(p.severity) !== -1 ? p.severity : 'medium',
-          audienceSegment: p.audienceSegment || '',
-          time: { display: null, seconds: null, url: null }
-        };
-      });
-    if (result.hookAnalysis) result.hookAnalysis.time = { display: null, seconds: null, url: null };
-  }
+  applyRealTimestamps(result, windowStarts, videoId);
 
   return result;
+}
+
+// Snap every AI-cited timestamp field in a Transcript Intelligence result to
+// a real marker (or null it out) — shared shape used by both this playbook
+// dissection and analyze-content.js's video/transcript analysis.
+function applyRealTimestamps(result, windowStarts, videoId) {
+  const hasRealTimestamps = !!windowStarts;
+  const timeFor = function (raw) {
+    return hasRealTimestamps ? contentAnalysis.withRealTimestamp(raw, windowStarts, videoId) : contentAnalysis.noTimestamp();
+  };
+
+  result.chapters = (result.chapters || [])
+    .filter(function (c) { return c && typeof c.title === 'string'; })
+    .map(function (c) { return { time: timeFor(c.timestamp), title: c.title, description: c.description || '' }; });
+  result.keyClaims = (result.keyClaims || [])
+    .filter(function (c) { return c && typeof c.claim === 'string'; })
+    .map(function (c) { return { claim: c.claim, time: timeFor(c.timestamp) }; });
+  result.painPoints = (result.painPoints || [])
+    .filter(function (p) { return p && typeof p.painPoint === 'string'; })
+    .map(function (p) {
+      return {
+        painPoint: p.painPoint,
+        severity: ['low', 'medium', 'high'].indexOf(p.severity) !== -1 ? p.severity : 'medium',
+        audienceSegment: p.audienceSegment || '',
+        time: timeFor(p.timestamp)
+      };
+    });
+  if (result.hookAnalysis) {
+    result.hookAnalysis.time = timeFor(result.hookAnalysis.timestamp);
+  }
 }
 
 async function fetchVideoTitle(videoId) {
@@ -221,5 +139,6 @@ async function fetchVideoTitle(videoId) {
 
 module.exports = {
   dissectTranscript: dissectTranscript,
+  applyRealTimestamps: applyRealTimestamps,
   fetchVideoTitle: fetchVideoTitle
 };

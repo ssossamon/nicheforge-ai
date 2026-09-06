@@ -1232,6 +1232,7 @@ function renderVideoAnalysis(ev, ai) {
   html += evCell('Channel avg views', ev.channelAvgRecentViews === null ? 'unknown' : ev.channelAvgRecentViews.toLocaleString());
   html += '</div>';
   html += '<div class="muted-lo" style="font-size:12px;margin-bottom:18px;">Score formula: ' + escapeHtml(ev.videoPerformanceFormula) + '</div>';
+  html += buildTranscriptIntelligenceHtml(ai);
   html += '<div class="opp"><h4>What\u2019s working</h4><p>' + escapeHtml(ai.whatIsWorking) + '</p></div>';
   html += '<div class="opp"><h4>Why it\u2019s performing</h4><p>' + escapeHtml(ai.whyItsPerforming) + '</p></div>';
   if (ai.spinOffIdeas && ai.spinOffIdeas.length) {
@@ -1296,6 +1297,7 @@ function renderTranscriptAnalysis(ev, ai) {
   html += '<div style="text-align:right;"><div class="score">' + ai.scriptQualityScore + '</div><div class="muted-lo" style="font-size:12px;">Script Quality Score (AI estimate)</div></div>';
   html += '</div><div class="dossier-body">';
   html += '<div class="muted-lo" style="font-size:12px;margin-bottom:16px;">' + escapeHtml(ai.scoreRationale) + '</div>';
+  html += buildTranscriptIntelligenceHtml(ai);
   html += '<div class="opp"><h4>Hook assessment</h4><p>' + escapeHtml(ai.hookAssessment) + '</p></div>';
   html += '<div class="opp"><h4>Structure notes</h4><p>' + escapeHtml(ai.structureNotes) + '</p></div>';
   if (ai.suggestedTitles && ai.suggestedTitles.length) {

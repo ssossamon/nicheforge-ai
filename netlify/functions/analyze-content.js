@@ -8,6 +8,7 @@
 const { connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 const contentAnalysis = require('./_shared/content-analysis');
+const playbookCore = require('./_shared/playbook-core');
 const core = require('./_shared/scan-core');
 
 exports.handler = async function (event) {
@@ -69,7 +70,7 @@ exports.handler = async function (event) {
 
     let ai;
     try {
-      ai = await runVideoAi(aiProvider, aiApiKey, aiModel, evidence);
+      ai = await runVideoAi(aiProvider, aiApiKey, aiModel, evidence, detected.videoId);
     } catch (e) {
       return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message, e.whatToDoNext, e.rawResponse ? { _diagnostics: { rawAiResponse: e.rawResponse } } : undefined);
     }
@@ -139,14 +140,41 @@ exports.handler = async function (event) {
 // AI analysis — video
 // ===========================================================================
 
-async function runVideoAi(provider, apiKey, model, ev) {
+async function runVideoAi(provider, apiKey, model, ev, videoId) {
+  let markedTranscript = null;
+  let windowStarts = null;
+  if (ev.transcript && ev.transcript.segments) {
+    const built = contentAnalysis.buildMarkedTranscript(ev.transcript.segments);
+    markedTranscript = built.markedText;
+    windowStarts = built.windowStarts;
+  }
+  const hasTranscript = !!markedTranscript;
+
   const systemPrompt =
     'You are a YouTube content analyst working from REAL data about one specific video, provided below. ' +
     'Never invent statistics beyond what is given. Respond with STRICT JSON only, no markdown fences, matching exactly: ' +
     '{"whatIsWorking":string,"whyItsPerforming":string,"spinOffIdeas":[string,string,string,string,string],"contentGap":string,' +
-    '"monetizationAngles":[{"type":string,"description":string}]}. ' +
+    '"monetizationAngles":[{"type":string,"description":string}],' +
+    '"summary":string|null,\n' +
+    '"chapters":[{"timestamp":string|null,"title":string,"description":string}],\n' +
+    '"keyClaims":[{"claim":string,"timestamp":string|null}],\n' +
+    '"frameworksAndProcesses":[string],\n' +
+    '"toolsAndResources":[string],\n' +
+    '"painPoints":[{"painPoint":string,"severity":"low"|"medium"|"high","audienceSegment":string,"timestamp":string|null}],\n' +
+    '"desiredOutcomes":[string],\n' +
+    '"hookAnalysis":{"technique":string,"description":string,"timestamp":string|null}|null,\n' +
+    '"persuasionDevices":[string],\n' +
+    '"factCheckQueue":[string]}. ' +
     '"whyItsPerforming" must cite a real number from the evidence. "spinOffIdeas" are original title ideas inspired by (not copied from) ' +
-    'this video\u2019s style. If a transcript is provided, ground "whatIsWorking" in its actual structure/hook; if not, say so and work from title/description/comments instead.';
+    'this video\u2019s style. ' +
+    (hasTranscript
+      ? 'The transcript below has real [T=M:SS] time markers inserted at ~20-second intervals. Whenever you reference a specific moment ' +
+        '(a chapter, a key claim, a pain point, the hook), you MUST copy one of the exact [T=...] marker values shown \u2014 never invent a ' +
+        'time. Ground "whatIsWorking", the chapters, claims, pain points, and hook analysis in the transcript\u2019s actual structure/hook. ' +
+        'Paraphrase transcript wording rather than quoting more than a short phrase (under 12 words), since this may be copyrighted. ' +
+        'Identify 3-6 chapters, 2-5 key claims, and 2-4 pain points if the transcript genuinely supports them.'
+      : 'No transcript is available, so set "summary", "chapters", "keyClaims", "painPoints", and "hookAnalysis" to null/empty and work ' +
+        'from title/description/comments only \u2014 do not invent transcript-derived content.');
 
   const userPrompt =
     'VIDEO: "' + ev.title + '" by ' + ev.channelTitle + (ev.isShort ? ' (a Short)' : '') + '\n' +
@@ -154,15 +182,25 @@ async function runVideoAi(provider, apiKey, model, ev) {
     'REAL STATS: ' + ev.views + ' views, ' + ev.likes + ' likes, ' + ev.commentCount + ' comments.\n' +
     (ev.channelAvgRecentViews ? 'This channel\u2019s recent average views: ' + ev.channelAvgRecentViews + '.\n' : '') +
     'Video Performance Score (deterministic, not AI-generated): ' + ev.videoPerformanceScore + '/100.\n\n' +
-    (ev.transcript
-      ? 'REAL TRANSCRIPT (first portion):\n' + ev.transcript.slice(0, 4000) + '\n\n'
+    (hasTranscript
+      ? 'REAL TRANSCRIPT (with real [T=M:SS] markers):\n' + markedTranscript + '\n\n'
       : 'No transcript/captions were available for this video.\n\n') +
     (ev.topComments && ev.topComments.length
       ? 'REAL TOP COMMENTS:\n' + ev.topComments.slice(0, 6).map(function (c) { return '- "' + c.text + '" (' + c.likeCount + ' likes)'; }).join('\n') + '\n\n'
       : '') +
     'Using ONLY the evidence above, produce the JSON described in your instructions.';
 
-  return callAi(provider, apiKey, model, systemPrompt, userPrompt, ['whatIsWorking']);
+  const result = await callAi(provider, apiKey, model, systemPrompt, userPrompt, ['whatIsWorking']);
+  if (!Array.isArray(result.chapters)) result.chapters = [];
+  if (!Array.isArray(result.keyClaims)) result.keyClaims = [];
+  if (!Array.isArray(result.frameworksAndProcesses)) result.frameworksAndProcesses = [];
+  if (!Array.isArray(result.toolsAndResources)) result.toolsAndResources = [];
+  if (!Array.isArray(result.painPoints)) result.painPoints = [];
+  if (!Array.isArray(result.desiredOutcomes)) result.desiredOutcomes = [];
+  if (!Array.isArray(result.persuasionDevices)) result.persuasionDevices = [];
+  if (!Array.isArray(result.factCheckQueue)) result.factCheckQueue = [];
+  playbookCore.applyRealTimestamps(result, windowStarts, videoId);
+  return result;
 }
 
 // ===========================================================================
@@ -197,15 +235,38 @@ async function runChannelAi(provider, apiKey, model, ev) {
 
 async function runTranscriptAi(provider, apiKey, model, text) {
   const systemPrompt =
-    'You are a video-scripting coach reviewing a pasted transcript or script draft. There is NO real performance data — ' +
-    'you are giving a subjective structural assessment, not measuring anything real. Respond with STRICT JSON only, no markdown fences: ' +
-    '{"scriptQualityScore":number,"scoreRationale":string,"hookAssessment":string,"structureNotes":string,"suggestedTitles":[string,string,string],"improvementIdeas":[string,string,string]}. ' +
+    'You are a video-scripting coach reviewing a pasted transcript or script draft. There is NO real performance data and no real ' +
+    'timing data — you are giving a subjective structural assessment, not measuring anything real, and every timestamp field must ' +
+    'be left null. Respond with STRICT JSON only, no markdown fences: ' +
+    '{"scriptQualityScore":number,"scoreRationale":string,"hookAssessment":string,"structureNotes":string,' +
+    '"suggestedTitles":[string,string,string],"improvementIdeas":[string,string,string],' +
+    '"summary":string,\n' +
+    '"chapters":[{"timestamp":null,"title":string,"description":string}],\n' +
+    '"keyClaims":[{"claim":string,"timestamp":null}],\n' +
+    '"frameworksAndProcesses":[string],\n' +
+    '"toolsAndResources":[string],\n' +
+    '"painPoints":[{"painPoint":string,"severity":"low"|"medium"|"high","audienceSegment":string,"timestamp":null}],\n' +
+    '"desiredOutcomes":[string],\n' +
+    '"hookAnalysis":{"technique":string,"description":string,"timestamp":null},\n' +
+    '"persuasionDevices":[string],\n' +
+    '"factCheckQueue":[string]}. ' +
     '"scriptQualityScore" is 0-100, your own structural estimate (hook strength, pacing, clarity, CTA) — "scoreRationale" must say plainly that ' +
-    'this is an AI estimate, not a measured or predicted performance outcome.';
+    'this is an AI estimate, not a measured or predicted performance outcome. Ground every field only in what this text actually contains; ' +
+    '"factCheckQueue" lists specific factual claims worth independently verifying, omitted if none exist.';
 
   const userPrompt = 'PASTED TEXT:\n' + text.slice(0, 6000) + '\n\nProduce the JSON described in your instructions.';
 
-  return callAi(provider, apiKey, model, systemPrompt, userPrompt, ['scriptQualityScore', 'hookAssessment']);
+  const result = await callAi(provider, apiKey, model, systemPrompt, userPrompt, ['scriptQualityScore', 'hookAssessment']);
+  if (!Array.isArray(result.chapters)) result.chapters = [];
+  if (!Array.isArray(result.keyClaims)) result.keyClaims = [];
+  if (!Array.isArray(result.frameworksAndProcesses)) result.frameworksAndProcesses = [];
+  if (!Array.isArray(result.toolsAndResources)) result.toolsAndResources = [];
+  if (!Array.isArray(result.painPoints)) result.painPoints = [];
+  if (!Array.isArray(result.desiredOutcomes)) result.desiredOutcomes = [];
+  if (!Array.isArray(result.persuasionDevices)) result.persuasionDevices = [];
+  if (!Array.isArray(result.factCheckQueue)) result.factCheckQueue = [];
+  playbookCore.applyRealTimestamps(result, null, null);
+  return result;
 }
 
 // ===========================================================================
