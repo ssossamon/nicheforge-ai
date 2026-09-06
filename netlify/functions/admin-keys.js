@@ -16,10 +16,7 @@ const license = require('./_shared/license');
 function checkAdmin(event) {
   const provided = event.headers['x-admin-key'] || event.headers['X-Admin-Key'];
   const expected = process.env.ADMIN_KEY;
-  if (!expected) {
-    return http.fail(503, 'admin_key_not_configured', 'Admin access is not configured.', 'Set ADMIN_KEY privately in the Netlify environment.');
-  }
-  return provided && provided === expected;
+  return !!(expected && provided && provided === expected);
 }
 
 function toCsv(rows, columns) {
@@ -39,6 +36,9 @@ exports.handler = async function (event) {
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');
+  }
+  if (!process.env.ADMIN_KEY) {
+    return http.fail(503, 'admin_key_not_configured', 'Admin access is not configured.', 'Set ADMIN_KEY privately in the Netlify environment.');
   }
   if (!checkAdmin(event)) {
     return http.fail(401, 'unauthorized', 'Missing or invalid admin key.', 'Enter your owner/admin key in the admin panel login screen.');
