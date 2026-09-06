@@ -54,10 +54,19 @@
   .brand{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk';font-weight:700;font-size:18px;}
   .brand .mark{width:22px;height:22px;border-radius:50%;border:2px solid var(--brass);position:relative;flex:none;}
   .brand .mark:before{content:'';position:absolute;inset:5px;border-radius:50%;background:var(--brass);}
-  .navlinks{display:flex;gap:28px;font-size:14px;color:var(--muted-hi);}
-  .navlinks a{text-decoration:none;}
+  .navlinks{display:flex;align-items:center;gap:28px;font-size:14px;color:var(--muted-hi);}
+  .navlinks a{text-decoration:none;white-space:nowrap;}
   .navlinks a:hover{color:var(--text-hi);}
   .navcta{background:var(--brass);color:var(--ink);padding:9px 16px;border-radius:var(--radius);font-weight:600;font-size:14px;text-decoration:none;}
+  .navdropdown{position:relative;}
+  .navdropdown-trigger{background:none;border:none;color:var(--muted-hi);font-size:14px;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;white-space:nowrap;}
+  .navdropdown-trigger:hover{color:var(--text-hi);}
+  .navdropdown-arrow{font-size:9px;transition:transform 0.15s;}
+  .navdropdown-arrow.open{transform:rotate(180deg);}
+  .navdropdown-menu{display:none;position:absolute;top:calc(100% + 20px);right:0;background:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px;min-width:170px;box-shadow:0 12px 32px rgba(0,0,0,0.45);flex-direction:column;gap:2px;z-index:50;}
+  .navdropdown-menu.open{display:flex;}
+  .navdropdown-menu a{padding:9px 12px;border-radius:4px;font-size:13.5px;color:var(--muted-hi);text-decoration:none;white-space:nowrap;}
+  .navdropdown-menu a:hover{background:rgba(255,255,255,0.07);color:var(--text-hi);}
 
   /* ---------- hero ---------- */
   .hero{padding:64px 0 40px;position:relative;overflow:hidden;}
@@ -262,11 +271,14 @@
 
   footer{border-top:1px solid var(--line);padding:32px 0;font-size:13px;color:var(--muted-hi);}
   footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .footer-links{display:flex;gap:20px;flex-wrap:wrap;}
+  .footer-links a{color:var(--muted-hi);text-decoration:none;}
+  .footer-links a:hover{color:var(--text-hi);}
 
   /* modal */
   .modal-veil{position:fixed;inset:0;background:rgba(6,11,18,0.7);display:none;align-items:center;justify-content:center;z-index:80;padding:20px;}
   .modal-veil.open{display:flex;}
-  .modal{background:var(--paper);color:var(--text-lo);border-radius:6px;padding:28px;max-width:420px;width:100%;}
+  .modal{background:var(--paper);color:var(--text-lo);border-radius:6px;padding:28px;max-width:420px;width:100%;max-height:88vh;overflow-y:auto;}
   .modal h3{font-size:19px;}
   .modal p{font-size:14px;color:var(--muted-lo);}
 
@@ -289,12 +301,18 @@
       <a href="#evidence">Why trust the data</a>
       <a href="#pricing">Pricing</a>
       <a href="#license">Activate license</a>
-      <a href="javascript:void(0)" id="nav-settings-link">Settings</a>
-      <a href="javascript:void(0)" id="nav-history-link">History</a>
-      <a href="javascript:void(0)" id="nav-watchlist-link">Watchlist</a>
-      <a href="javascript:void(0)" id="nav-reports-link">Reports</a>
-      <a href="javascript:void(0)" id="nav-competitors-link">Competitors</a>
-      <a href="javascript:void(0)" id="nav-playbooks-link">Playbooks</a>
+      <div class="navdropdown" id="nav-tools-dropdown">
+        <button type="button" class="navdropdown-trigger" id="nav-tools-trigger">Tools <span class="navdropdown-arrow">\u25BE</span></button>
+        <div class="navdropdown-menu" id="nav-tools-menu">
+          <a href="javascript:void(0)" id="nav-settings-link">Settings</a>
+          <a href="javascript:void(0)" id="nav-history-link">History</a>
+          <a href="javascript:void(0)" id="nav-watchlist-link">Watchlist</a>
+          <a href="javascript:void(0)" id="nav-reports-link">Reports</a>
+          <a href="javascript:void(0)" id="nav-competitors-link">Competitors</a>
+          <a href="javascript:void(0)" id="nav-playbooks-link">Playbooks</a>
+          <a href="javascript:void(0)" id="nav-import-export-link">Import / Export</a>
+        </div>
+      </div>
     </div>
     <a class="navcta" href="#scan">Run a free scan</a>
   </div>
@@ -550,8 +568,15 @@
 
 <footer>
   <div class="wrap">
-    <div>NicheForge AI v1.0</div>
-    <div class="muted-hi">Built for video &amp; content marketers. Your data stays yours.</div>
+    <div>
+      <div>&copy; <span id="footer-year"></span> NicheForge AI. Built for video &amp; content marketers. Your data stays yours.</div>
+    </div>
+    <div class="footer-links">
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+      <a href="/terms.html#refunds">Refund Policy</a>
+      <a href="mailto:REPLACE-WITH-YOUR-SUPPORT-EMAIL">Contact</a>
+    </div>
   </div>
 </footer>
 
@@ -620,6 +645,45 @@
       <button class="btn btn-ghost" id="btn-close-settings" type="button">Close</button>
     </div>
     <div id="settings-save-status" class="status-line"></div>
+  </div>
+</div>
+
+<div class="modal-veil" id="import-export-modal">
+  <div class="modal" style="max-width:560px;">
+    <h3>Import / Export</h3>
+    <p>Bring in topics or a transcript from another tool — like a browser extension that collected them while you were browsing. JSON or plain text both work. Export your saved data to reuse elsewhere.</p>
+
+    <div class="field" style="border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label for="import-topics-paste">Import topics for Batch Scan</label>
+      <div class="helper">A JSON array of strings, or plain text with one topic per line. Up to 5 will be used.</div>
+      <input type="file" id="import-topics-file" accept=".json,.txt,text/plain,application/json" style="margin-top:8px;display:block;" />
+      <textarea id="import-topics-paste" rows="3" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:13px;font-family:inherit;margin-top:8px;" placeholder='["topic one", "topic two"]  —or—  one topic per line'></textarea>
+      <button class="btn btn-ghost" id="btn-import-topics" type="button" style="margin-top:8px;">Import into Batch Scan</button>
+      <span id="import-topics-status" class="status-line"></span>
+    </div>
+
+    <div class="field" style="margin-top:18px;border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label for="import-transcript-paste">Import a transcript</label>
+      <div class="helper">A .txt file, or JSON with a &ldquo;transcript&rdquo;, &ldquo;text&rdquo;, or &ldquo;content&rdquo; field.</div>
+      <input type="file" id="import-transcript-file" accept=".json,.txt,text/plain,application/json" style="margin-top:8px;display:block;" />
+      <textarea id="import-transcript-paste" rows="3" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:13px;font-family:inherit;margin-top:8px;" placeholder="Paste transcript text or JSON here"></textarea>
+      <button class="btn btn-ghost" id="btn-import-transcript" type="button" style="margin-top:8px;">Import into Transcript Playbook</button>
+      <span id="import-transcript-status" class="status-line"></span>
+    </div>
+
+    <div class="field" style="margin-top:18px;border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label>Export your saved data</label>
+      <div class="helper">Downloads a JSON file — for backup, or to feed into another tool. Tied to the email you scan with.</div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-ghost" id="btn-export-history" type="button" style="flex:1;">Export History (JSON)</button>
+        <button class="btn btn-ghost" id="btn-export-watchlist" type="button" style="flex:1;">Export Watchlist (JSON)</button>
+      </div>
+      <span id="export-status" class="status-line"></span>
+    </div>
+
+    <div style="margin-top:18px;">
+      <button class="btn btn-ghost" id="btn-close-import-export-modal" type="button">Close</button>
+    </div>
   </div>
 </div>
 
@@ -759,6 +823,7 @@ function lsSet(key, val) {
 }
 
 function el(id) { return document.getElementById(id); }
+if (el('footer-year')) el('footer-year').textContent = new Date().getFullYear();
 
 var OWNER_KEY = 'NFORGE-ADM-SCOTT-2026';
 
@@ -878,7 +943,220 @@ function closeSettingsModal() {
   el('settings-modal').className = 'modal-veil';
 }
 
+// ---- Tools dropdown (nav) -------------------------------------------------
+
+el('nav-tools-trigger').addEventListener('click', function (e) {
+  e.stopPropagation();
+  el('nav-tools-menu').classList.toggle('open');
+  el('nav-tools-trigger').querySelector('.navdropdown-arrow').classList.toggle('open');
+});
+
+document.addEventListener('click', function (e) {
+  var dropdown = el('nav-tools-dropdown');
+  if (!dropdown.contains(e.target)) {
+    el('nav-tools-menu').classList.remove('open');
+    el('nav-tools-trigger').querySelector('.navdropdown-arrow').classList.remove('open');
+  }
+});
+
+el('nav-tools-menu').addEventListener('click', function (e) {
+  if (e.target.tagName === 'A') {
+    el('nav-tools-menu').classList.remove('open');
+    el('nav-tools-trigger').querySelector('.navdropdown-arrow').classList.remove('open');
+  }
+});
+
 el('nav-settings-link').addEventListener('click', openSettingsModal);
+
+// ---- Import / Export ---------------------------------------------------
+
+el('nav-import-export-link').addEventListener('click', function () {
+  el('import-export-modal').className = 'modal-veil open';
+});
+el('btn-close-import-export-modal').addEventListener('click', function () {
+  el('import-export-modal').className = 'modal-veil';
+});
+
+function readFileAsText(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function (e) { callback(e.target.result); };
+  reader.onerror = function () { callback(null); };
+  reader.readAsText(file);
+}
+
+function parseTopicsInput(raw) {
+  raw = (raw || '').trim();
+  if (!raw) return [];
+  var topics = [];
+  try {
+    var parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      for (var i = 0; i < parsed.length; i++) {
+        if (typeof parsed[i] === 'string' && parsed[i].trim()) topics.push(parsed[i].trim());
+      }
+    }
+  } catch (e) { /* not JSON - fall through to line-splitting */ }
+  if (topics.length === 0) {
+    var lines = raw.split(/\r?\n/);
+    for (var j = 0; j < lines.length; j++) {
+      var line = lines[j].trim();
+      if (line) topics.push(line);
+    }
+  }
+  return topics.slice(0, 5);
+}
+
+function parseTranscriptInput(raw) {
+  raw = (raw || '').trim();
+  if (!raw) return { ok: false };
+  var looksLikeJson = raw.charAt(0) === '{' || raw.charAt(0) === '[';
+  if (looksLikeJson) {
+    try {
+      var parsed = JSON.parse(raw);
+      var candidate = null;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        candidate = parsed.transcript || parsed.text || parsed.content || null;
+      }
+      if (typeof candidate === 'string' && candidate.trim()) return { ok: true, text: candidate.trim() };
+      return { ok: false };
+    } catch (e) {
+      return { ok: true, text: raw }; // looked like JSON but wasn't valid - treat as plain text
+    }
+  }
+  return { ok: true, text: raw };
+}
+
+el('btn-import-topics').addEventListener('click', function () {
+  var file = el('import-topics-file').files[0];
+  var finish = function (raw) {
+    var topics = parseTopicsInput(raw);
+    if (topics.length === 0) {
+      el('import-topics-status').textContent = 'Could not find any topics in that \u2014 check the format.';
+      el('import-topics-status').className = 'status-line status-bad';
+      return;
+    }
+    el('f-batch-queries').value = topics.join('\n');
+    setMode('batch');
+    el('import-export-modal').className = 'modal-veil';
+    el('scan-status').textContent = 'Imported ' + topics.length + ' topic' + (topics.length === 1 ? '' : 's') + ' \u2014 ready to scan.';
+    el('scan').scrollIntoView({ behavior: 'smooth' });
+  };
+  if (file) {
+    readFileAsText(file, function (content) {
+      if (content === null) {
+        el('import-topics-status').textContent = 'Could not read that file.';
+        el('import-topics-status').className = 'status-line status-bad';
+        return;
+      }
+      finish(content);
+    });
+  } else {
+    finish(el('import-topics-paste').value);
+  }
+});
+
+el('btn-import-transcript').addEventListener('click', function () {
+  var file = el('import-transcript-file').files[0];
+  var finish = function (raw) {
+    var result = parseTranscriptInput(raw);
+    if (!result.ok) {
+      el('import-transcript-status').textContent = 'That JSON didn\u2019t have a transcript/text/content field \u2014 try pasting plain text instead.';
+      el('import-transcript-status').className = 'status-line status-bad';
+      return;
+    }
+    el('f-transcript-input').value = result.text;
+    setMode('playbook');
+    el('import-export-modal').className = 'modal-veil';
+    el('scan-status').textContent = 'Transcript imported \u2014 ready to build the playbook.';
+    el('scan').scrollIntoView({ behavior: 'smooth' });
+  };
+  if (file) {
+    readFileAsText(file, function (content) {
+      if (content === null) {
+        el('import-transcript-status').textContent = 'Could not read that file.';
+        el('import-transcript-status').className = 'status-line status-bad';
+        return;
+      }
+      finish(content);
+    });
+  } else {
+    finish(el('import-transcript-paste').value);
+  }
+});
+
+function downloadJson(filename, dataObj) {
+  var blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+el('btn-export-history').addEventListener('click', function () {
+  var email = lsGet('email');
+  if (!email) {
+    el('export-status').textContent = 'Run a scan first \u2014 history is tied to the email you scan with.';
+    el('export-status').className = 'status-line status-bad';
+    return;
+  }
+  el('export-status').textContent = 'Preparing export\u2026';
+  el('export-status').className = 'status-line';
+  fetch('/api/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('export-status').textContent = 'Could not export history.';
+        el('export-status').className = 'status-line status-bad';
+        return;
+      }
+      downloadJson('nicheforge-history.json', { exportedAt: new Date().toISOString(), source: 'NicheForge AI', type: 'history', email: email, items: data.history });
+      el('export-status').textContent = 'Downloaded ' + data.history.length + ' history item' + (data.history.length === 1 ? '' : 's') + '.';
+      el('export-status').className = 'status-line status-ok';
+    })
+    .catch(function (e) {
+      el('export-status').textContent = 'Network error: ' + e.message;
+      el('export-status').className = 'status-line status-bad';
+    });
+});
+
+el('btn-export-watchlist').addEventListener('click', function () {
+  var email = lsGet('email');
+  if (!email) {
+    el('export-status').textContent = 'Run a scan first \u2014 watchlist is tied to the email you scan with.';
+    el('export-status').className = 'status-line status-bad';
+    return;
+  }
+  el('export-status').textContent = 'Preparing export\u2026';
+  el('export-status').className = 'status-line';
+  fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('export-status').textContent = 'Could not export watchlist.';
+        el('export-status').className = 'status-line status-bad';
+        return;
+      }
+      downloadJson('nicheforge-watchlist.json', { exportedAt: new Date().toISOString(), source: 'NicheForge AI', type: 'watchlist', email: email, items: data.watchlist });
+      el('export-status').textContent = 'Downloaded ' + data.watchlist.length + ' watchlist item' + (data.watchlist.length === 1 ? '' : 's') + '.';
+      el('export-status').className = 'status-line status-ok';
+    })
+    .catch(function (e) {
+      el('export-status').textContent = 'Network error: ' + e.message;
+      el('export-status').className = 'status-line status-bad';
+    });
+});
 el('btn-open-settings').addEventListener('click', openSettingsModal);
 el('btn-close-settings').addEventListener('click', closeSettingsModal);
 

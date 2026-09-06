@@ -171,6 +171,113 @@ discriminate sensibly); confirmed zero changes needed in `reports.js`,
 and remain fully compatible); full backend + frontend syntax/style/id
 validation.
 
+## v2.7 — Import / Export (JSON or plain text)
+
+New "Import / Export" item in the Tools dropdown, added as a generic
+interop point rather than a one-off feature — it accepts JSON or plain
+text from *any* outside source (a companion Chrome extension you build
+later, a spreadsheet, a text file, another AI tool's output), not a
+proprietary format only NicheForge understands.
+
+**Import topics for Batch Scan** — a JSON array of strings, or plain text
+with one topic per line (file upload or paste, either works). Parses up
+to 5, drops empty lines/non-string entries, fills the Batch Scan
+textarea, switches to Batch mode automatically.
+
+**Import a transcript** — a .txt file/paste, or JSON with a
+`transcript`, `text`, or `content` field. If it looks like JSON but has
+none of those fields, it says so rather than silently dumping raw JSON
+into the transcript box. If it looks like JSON but doesn't actually
+parse, falls back to treating it as plain text rather than erroring.
+
+**Export History / Watchlist as JSON** — one click, downloads a JSON
+file (`exportedAt`, `source`, `type`, your `email`, and the `items`
+array) tied to whatever email you're currently scanning with. This is
+the summary-level data (query/score/timestamp/etc.), the same shape the
+in-app History and Watchlist panels already show — not a full per-scan
+evidence+AI dump, since that would mean fetching every single entry
+individually. If you need the full write-up for one specific scan, the
+existing per-scan PDF export already covers that.
+
+**Verified with real functional tests, not just syntax checks**: 14
+parsing cases (JSON arrays, plain text, mixed valid/invalid entries,
+the 5-item cap, JSON objects with each of the three transcript field
+names, a JSON object with none of them, JSON-looking-but-invalid text
+falling back to plain text, empty input) — all passed. Also verified
+end-to-end: paste-based import, file-upload-based import (both
+topics.json and transcript.txt), the error path when nothing usable is
+found, that the nav dropdown still closes correctly when this new item
+is clicked (no regression from the v2.5 dropdown work), and the export
+flow with a mocked fetch confirming the right endpoint/payload and an
+actual download getting triggered with the right filename.
+
+## v2.6 — Added Privacy Policy, Terms of Service, and footer legal links
+
+**What was added:**
+- `privacy.html` — new standalone page, brand-matched
+- `terms.html` — new standalone page, includes a Refund Policy section (Section 7) since PayPal is used for paid tiers, and an Acceptable Use section
+- Footer on the main app now links to both, plus a Refund Policy link (jumps to `terms.html#refunds`) and a Contact link
+
+**Why this matters beyond just "looking complete":** NicheForge uses YouTube API Services, and Google's own developer policies *require* apps using that API to (1) publish a privacy policy disclosing what data is accessed, and (2) reference YouTube's Terms of Service in the app's own terms — verified this against Google's current developer policy docs and a real compliance-violation example before drafting, rather than assuming. Both new pages include the required YouTube ToS / Google Privacy Policy links and disclosure language for this.
+
+**\u26A0\uFE0F Action items before this goes live — I did not invent these, on purpose:**
+1. Both pages have a visible disclaimer box up top: this is a draft I wrote to accurately match what NicheForge actually does, not legal advice, and hasn't been reviewed by an attorney. Given real payment processing and email collection, a quick review (a lawyer, or a service like Termly/Rocket Lawyer) is worth it before this is final.
+2. Search both pages for `[bracketed placeholders]` — your business/entity name, a real support email, your governing-law state/country, and your actual refund window (I left the refund policy language as a fill-in-the-blank since I don't know what window/conditions you actually want to honor).
+3. The footer's "Contact" link currently points at `mailto:REPLACE-WITH-YOUR-SUPPORT-EMAIL` — deliberately obvious so it can't accidentally ship broken or pointing at an email you didn't choose. Swap in whatever inbox you actually want this going to.
+
+## v2.5 — Cleaned up the top nav (was 10 items wrapping onto multiple lines)
+
+The nav bar had grown to 10 items in a fixed 64px-tall bar with no wrap
+strategy, on top of adding Competitors and Playbooks in v1.7 with nothing
+removed to make room. Individual labels like "How it works" and "Why
+trust the data" were wrapping their own text onto 2-3 lines to fit,
+looking cramped even on a full-width desktop viewport.
+
+Split the 10 items by what they actually are: 4 marketing anchor-links
+(How it works / Why trust the data / Pricing / Activate license) stay
+visible in the top-level nav, since they matter to first-time visitors
+reading the landing page. The 6 app-tool links (Settings / History /
+Watchlist / Reports / Competitors / Playbooks) — all modal-openers for
+people already using the app, not landing-page content — now live inside
+a single "Tools \u25BE" dropdown. Net: 5 visible top-level items instead of
+10, with `white-space:nowrap` added defensively so no individual label
+can wrap again regardless of viewport width.
+
+None of the 6 tools' own click handlers were touched — same IDs, same
+wiring, just relocated inside the dropdown's markup. Verified this
+directly with a jsdom interaction test: dropdown closed by default, opens
+on trigger click, toggles closed on a second click, closes on any outside
+click, and closing-on-select vs. the original handler firing are both
+independently confirmed (clicking "Settings" inside the dropdown closes
+the dropdown AND still opens the real Settings modal, checked via its
+actual `open` class, not just event flow).
+
+## v2.4 — Fixed: modals with no scroll mechanism could cut off content
+
+**Bug found**: the base `.modal` CSS class had no `max-height` or
+`overflow-y` at all — 5 of 12 modals had picked up an ad-hoc
+`max-height:85vh;overflow-y:auto;` inline override over time (channel
+breakdown, competitors, playbooks, playbook-view), but 7 others, including
+Settings, had none. Settings just grew six new weight-adjustment rows in
+v2.2, making it tall enough to exceed the viewport on many screens with no
+way to scroll and see the rest (Save/Close buttons, bottom rows) — that's
+what surfaced this.
+
+**Fixed at the base class**, not by patching Settings alone: added
+`max-height:88vh;overflow-y:auto;` to `.modal` itself, so every modal —
+the ones that already had their own override, the ones that had none, and
+any modal added in the future — gets a safety net by default. Inline
+overrides on the 5 modals that already had one still win (CSS specificity),
+so nothing changes for them; the fix only helps the 7 that had zero
+protection.
+
+**Verified with a real jsdom computed-style check**, not just confirming
+the CSS text exists: opened the Settings modal and checked its actual
+computed `max-height`/`overflow-y`, confirmed a modal with its own prior
+override still resolves identically (no conflict), and confirmed a modal
+that previously had zero handling (email capture) now gets the same
+protection.
+
 ## v2.3 — Ranked opportunity cards (Content/Audience/Product/Offer/Format/Authority/Workflow/Education gaps)
 
 Extends the existing single `contentGap` string (kept, unchanged) with a ranked
