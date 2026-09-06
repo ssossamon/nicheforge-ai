@@ -113,6 +113,34 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v1.4 — content analyzer: video/channel URLs, Shorts, transcripts
+
+A third "Analyze URL" tab accepts a pasted YouTube video URL (including
+Shorts), a channel URL/@handle, or raw transcript/script text — and
+auto-detects which one it is (`_shared/content-analysis.js`).
+
+- **Video URL/Short** → real stats (views, likes, comments), real transcript
+  via YouTube's public caption endpoint (no OAuth needed, not every video
+  has one), real top comments, and a **Video Performance Score** (0-100,
+  transparent formula: view velocity + performance vs. the channel's own
+  recent average + engagement rate). AI analysis is grounded in the real
+  transcript when available, title/description/comments when not — the UI
+  states which.
+- **Channel URL/@handle** → resolves handles, `/user/`, and `/c/` URLs to a
+  channel ID, then reuses the same real-data engine as the existing
+  competitor breakdown, now also surfaced as a standalone analysis with a
+  **Channel Health Score** (0-100: upload cadence + recent performance trend
+  + views-to-subscribers ratio).
+- **Pasted transcript/script** → no real YouTube data exists for
+  unpublished text, so this is clearly labeled as an AI structural estimate:
+  a **Script Quality Score** with an explicit rationale saying it's an
+  estimate, not a measured or predicted outcome.
+
+`channel-breakdown.js` was refactored to share its fetching logic with the
+new analyzer (`gatherChannelEvidence` now lives in `_shared/content-analysis.js`)
+rather than duplicating it — the existing "click a channel in scan results"
+breakdown modal also now shows the new Channel Health Score.
+
 ## v1.3 — history, real comments, monetization angles, outlines, watchlist
 
 - **Scan history** (`netlify/functions/history.js`) — every successful scan is

@@ -216,8 +216,9 @@
       <div class="h3sub">Takes about 15 seconds per topic.</div>
 
       <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn btn-ghost" id="mode-single-btn" type="button" style="flex:1;background:var(--ink);color:#fff;">Single topic</button>
-        <button class="btn btn-ghost" id="mode-batch-btn" type="button" style="flex:1;">Batch (up to 5)</button>
+        <button class="btn btn-ghost" id="mode-single-btn" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;">Single topic</button>
+        <button class="btn btn-ghost" id="mode-batch-btn" type="button" style="flex:1;font-size:13px;">Batch (up to 5)</button>
+        <button class="btn btn-ghost" id="mode-analyze-btn" type="button" style="flex:1;font-size:13px;">Analyze URL</button>
       </div>
 
       <div class="field" id="single-query-field">
@@ -228,6 +229,12 @@
       <div class="field" id="batch-query-field" style="display:none;">
         <label for="f-batch-queries">Topics — one per line, up to 5</label>
         <textarea id="f-batch-queries" rows="5" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="budget home espresso setups&#10;pour over coffee for beginners&#10;cold brew at home"></textarea>
+      </div>
+
+      <div class="field" id="analyze-query-field" style="display:none;">
+        <label for="f-analyze-input">Video URL, Shorts URL, channel URL/@handle, or pasted transcript</label>
+        <textarea id="f-analyze-input" rows="5" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="https://youtube.com/watch?v=... or https://youtube.com/@handle or paste a transcript/script"></textarea>
+        <div class="helper">Auto-detects which of the three it is — no need to pick a type.</div>
       </div>
 
       <div class="field">
@@ -673,27 +680,34 @@ function setMode(mode) {
   currentMode = mode;
   var singleBtn = el('mode-single-btn');
   var batchBtn = el('mode-batch-btn');
+  var analyzeBtn = el('mode-analyze-btn');
+  var allBtns = [singleBtn, batchBtn, analyzeBtn];
+  allBtns.forEach(function (b) { b.style.background = 'transparent'; b.style.color = 'var(--brass-dim)'; });
+  el('single-query-field').style.display = 'none';
+  el('batch-query-field').style.display = 'none';
+  el('analyze-query-field').style.display = 'none';
+
   if (mode === 'single') {
     el('single-query-field').style.display = 'block';
-    el('batch-query-field').style.display = 'none';
     singleBtn.style.background = 'var(--ink)';
     singleBtn.style.color = '#fff';
-    batchBtn.style.background = 'transparent';
-    batchBtn.style.color = 'var(--brass-dim)';
     el('btn-scan').textContent = 'Run niche scan';
-  } else {
-    el('single-query-field').style.display = 'none';
+  } else if (mode === 'batch') {
     el('batch-query-field').style.display = 'block';
     batchBtn.style.background = 'var(--ink)';
     batchBtn.style.color = '#fff';
-    singleBtn.style.background = 'transparent';
-    singleBtn.style.color = 'var(--brass-dim)';
     el('btn-scan').textContent = 'Run batch scan';
+  } else {
+    el('analyze-query-field').style.display = 'block';
+    analyzeBtn.style.background = 'var(--ink)';
+    analyzeBtn.style.color = '#fff';
+    el('btn-scan').textContent = 'Analyze';
   }
 }
 
 el('mode-single-btn').addEventListener('click', function () { setMode('single'); });
 el('mode-batch-btn').addEventListener('click', function () { setMode('batch'); });
+el('mode-analyze-btn').addEventListener('click', function () { setMode('analyze'); });
 
 // Holds the {query, evidence, ai} for every dossier currently on screen, so
 // the PDF export button (clicked later, by index) can find its data again
@@ -710,7 +724,7 @@ el('btn-scan').addEventListener('click', function () {
     }
     if (!lsGet('ai_key')) { openSettingsModal(); return; }
     ensureEmail(function (email) { doScan(query, email); });
-  } else {
+  } else if (currentMode === 'batch') {
     var raw = el('f-batch-queries').value;
     var topics = raw.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; }).slice(0, 5);
     if (topics.length === 0) {
@@ -720,6 +734,15 @@ el('btn-scan').addEventListener('click', function () {
     }
     if (!lsGet('ai_key')) { openSettingsModal(); return; }
     ensureEmail(function (email) { doBatchScan(topics, email); });
+  } else {
+    var analyzeInput = el('f-analyze-input').value.trim();
+    if (!analyzeInput) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Paste a URL or transcript first.';
+      return;
+    }
+    if (!lsGet('ai_key')) { openSettingsModal(); return; }
+    ensureEmail(function (email) { doAnalyze(analyzeInput, email); });
   }
 });
 
@@ -819,6 +842,148 @@ function doBatchScan(topics, email) {
       el('scan-status').className = 'status-line status-bad';
       el('scan-status').textContent = 'Network error: ' + e.message;
     });
+}
+
+function doAnalyze(input, email) {
+  var provider = lsGet('ai_provider') || 'openai';
+  var apiKey = lsGet('ai_key') || '';
+  var youtubeKey = lsGet('youtube_key') || '';
+
+  maybeCaptureLead(email);
+
+  var btn = el('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = '';
+
+  fetch('/api/analyze-content', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      input: input,
+      email: email,
+      aiProvider: provider,
+      aiApiKey: apiKey,
+      youtubeApiKey: youtubeKey
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      btn.disabled = false;
+      setMode(currentMode);
+      if (!data.success) {
+        el('scan-status').className = 'status-line status-bad';
+        var msg = data.error ? data.error.message : 'Something went wrong.';
+        var next = data.error && data.error.whatToDoNext ? ' ' + data.error.whatToDoNext : '';
+        el('scan-status').textContent = msg + next;
+        return;
+      }
+      el('scan-status').textContent = '';
+      if (data.contentType === 'video') renderVideoAnalysis(data.evidence, data.ai);
+      else if (data.contentType === 'channel') renderChannelAnalysis(data.evidence, data.ai);
+      else renderTranscriptAnalysis(data.evidence, data.ai);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      setMode(currentMode);
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Network error: ' + e.message;
+    });
+}
+
+function renderVideoAnalysis(ev, ai) {
+  var html = '<div class="dossier"><div class="dossier-head">';
+  html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(ev.title) + '</h3><div class="muted-lo" style="font-size:13px;">' + escapeHtml(ev.channelTitle) + (ev.isShort ? ' \u00B7 Short' : '') + ' \u00B7 published ' + ev.daysSincePublished + ' days ago \u00B7 ' + (ev.transcript ? 'real transcript used' : 'no transcript available') + '</div></div>';
+  html += '<div style="text-align:right;"><div class="score">' + ev.videoPerformanceScore + '</div><div class="muted-lo" style="font-size:12px;">Video Performance Score</div></div>';
+  html += '</div><div class="dossier-body">';
+  html += '<div class="evrow">';
+  html += evCell('Views', ev.views.toLocaleString());
+  html += evCell('Likes', ev.likes.toLocaleString());
+  html += evCell('Comments', ev.commentCount.toLocaleString());
+  html += evCell('Channel avg views', ev.channelAvgRecentViews === null ? 'unknown' : ev.channelAvgRecentViews.toLocaleString());
+  html += '</div>';
+  html += '<div class="muted-lo" style="font-size:12px;margin-bottom:18px;">Score formula: ' + escapeHtml(ev.videoPerformanceFormula) + '</div>';
+  html += '<div class="opp"><h4>What\u2019s working</h4><p>' + escapeHtml(ai.whatIsWorking) + '</p></div>';
+  html += '<div class="opp"><h4>Why it\u2019s performing</h4><p>' + escapeHtml(ai.whyItsPerforming) + '</p></div>';
+  if (ai.spinOffIdeas && ai.spinOffIdeas.length) {
+    html += '<div class="opp"><h4>Spin-off video ideas</h4><div class="titleideas">';
+    for (var i = 0; i < ai.spinOffIdeas.length; i++) {
+      html += '<span class="tichip" data-copy="' + escapeHtml(ai.spinOffIdeas[i]) + '">' + escapeHtml(ai.spinOffIdeas[i]) + '</span>';
+    }
+    html += '</div></div>';
+  }
+  if (ai.contentGap) html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '</div>';
+  if (ai.monetizationAngles && ai.monetizationAngles.length) {
+    html += '<div style="margin-top:16px;border-top:1px solid var(--line-paper);padding-top:14px;"><div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Monetization angles</b></div>';
+    for (var m = 0; m < ai.monetizationAngles.length; m++) {
+      html += '<div style="margin-bottom:8px;"><b style="font-size:13.5px;color:var(--brass-dim);">' + escapeHtml(ai.monetizationAngles[m].type) + ':</b> <span style="font-size:13.5px;">' + escapeHtml(ai.monetizationAngles[m].description) + '</span></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div></div>';
+  showResults(html);
+}
+
+function renderChannelAnalysis(ev, ai) {
+  var html = '<div class="dossier"><div class="dossier-head">';
+  html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(ev.title) + '</h3><div class="muted-lo" style="font-size:13px;">' + (ev.subscriberCount === null ? 'subscribers hidden' : ev.subscriberCount.toLocaleString() + ' subscribers') + ' \u00B7 ' + ev.totalVideoCount.toLocaleString() + ' videos total</div></div>';
+  html += '<div style="text-align:right;"><div class="score">' + ev.channelHealthScore + '</div><div class="muted-lo" style="font-size:12px;">Channel Health Score</div></div>';
+  html += '</div><div class="dossier-body">';
+  html += '<div class="evrow">';
+  html += evCell('Uploads / week', ev.uploadsPerWeekRecent === null ? 'unknown' : ev.uploadsPerWeekRecent);
+  html += evCell('Shorts share', ev.shortsShareRecent === null ? 'unknown' : Math.round(ev.shortsShareRecent * 100) + '%');
+  html += evCell('Total views', ev.totalViewCount.toLocaleString());
+  html += evCell('Sampled uploads', ev.sampledRecentUploads);
+  html += '</div>';
+  html += '<div class="muted-lo" style="font-size:12px;margin-bottom:18px;">Score formula: ' + escapeHtml(ev.channelHealthFormula) + '</div>';
+  if (ev.topVideosInSample && ev.topVideosInSample.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Top videos in recent sample:</b></div><ul style="margin:0 0 18px;padding-left:18px;font-size:13.5px;">';
+    for (var t = 0; t < ev.topVideosInSample.length; t++) {
+      html += '<li>' + escapeHtml(ev.topVideosInSample[t].title) + ' \u2014 ' + ev.topVideosInSample[t].views.toLocaleString() + ' views</li>';
+    }
+    html += '</ul>';
+  }
+  html += '<div class="opp"><h4>Assessment</h4><p>' + escapeHtml(ai.assessment) + '</p></div>';
+  if (ai.contentOpportunities && ai.contentOpportunities.length) {
+    html += '<div class="opp"><h4>Content opportunities</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
+    for (var i = 0; i < ai.contentOpportunities.length; i++) html += '<li>' + escapeHtml(ai.contentOpportunities[i]) + '</li>';
+    html += '</ul></div>';
+  }
+  if (ai.contentGap) html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '</div>';
+  if (ai.monetizationAngles && ai.monetizationAngles.length) {
+    html += '<div style="margin-top:16px;border-top:1px solid var(--line-paper);padding-top:14px;"><div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Monetization angles</b></div>';
+    for (var m = 0; m < ai.monetizationAngles.length; m++) {
+      html += '<div style="margin-bottom:8px;"><b style="font-size:13.5px;color:var(--brass-dim);">' + escapeHtml(ai.monetizationAngles[m].type) + ':</b> <span style="font-size:13.5px;">' + escapeHtml(ai.monetizationAngles[m].description) + '</span></div>';
+    }
+    html += '</div>';
+  }
+  html += '</div></div>';
+  showResults(html);
+}
+
+function renderTranscriptAnalysis(ev, ai) {
+  var html = '<div class="dossier"><div class="dossier-head">';
+  html += '<div><h3 style="margin-bottom:2px;">Pasted script/transcript</h3><div class="muted-lo" style="font-size:13px;">' + ev.wordCount + ' words \u00B7 no real performance data exists for unpublished text</div></div>';
+  html += '<div style="text-align:right;"><div class="score">' + ai.scriptQualityScore + '</div><div class="muted-lo" style="font-size:12px;">Script Quality Score (AI estimate)</div></div>';
+  html += '</div><div class="dossier-body">';
+  html += '<div class="muted-lo" style="font-size:12px;margin-bottom:16px;">' + escapeHtml(ai.scoreRationale) + '</div>';
+  html += '<div class="opp"><h4>Hook assessment</h4><p>' + escapeHtml(ai.hookAssessment) + '</p></div>';
+  html += '<div class="opp"><h4>Structure notes</h4><p>' + escapeHtml(ai.structureNotes) + '</p></div>';
+  if (ai.suggestedTitles && ai.suggestedTitles.length) {
+    html += '<div class="opp"><h4>Suggested titles</h4><div class="titleideas">';
+    for (var i = 0; i < ai.suggestedTitles.length; i++) {
+      html += '<span class="tichip" data-copy="' + escapeHtml(ai.suggestedTitles[i]) + '">' + escapeHtml(ai.suggestedTitles[i]) + '</span>';
+    }
+    html += '</div></div>';
+  }
+  if (ai.improvementIdeas && ai.improvementIdeas.length) {
+    html += '<div class="opp"><h4>Improvement ideas</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
+    for (var j = 0; j < ai.improvementIdeas.length; j++) html += '<li>' + escapeHtml(ai.improvementIdeas[j]) + '</li>';
+    html += '</ul></div>';
+  }
+  html += '</div></div>';
+  showResults(html);
 }
 
 function maybeCaptureLead(email) {
@@ -1084,7 +1249,10 @@ function openChannelBreakdown(channelId, channelTitle) {
         return;
       }
       var c = data.channel;
-      var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(c.title) + '</h3>';
+      var html = '<div style="display:flex;justify-content:space-between;align-items:baseline;">';
+      html += '<h3 style="margin-bottom:2px;">' + escapeHtml(c.title) + '</h3>';
+      html += '<div style="text-align:right;"><div class="score" style="font-size:22px;">' + c.channelHealthScore + '</div><div class="muted-lo" style="font-size:11px;">Channel Health</div></div>';
+      html += '</div>';
       html += '<div class="muted-lo" style="font-size:13px;margin-bottom:16px;">' + escapeHtml(c.dataSource) + '</div>';
       html += '<div class="evrow" style="margin-bottom:16px;">';
       html += evCell('Subscribers', c.subscriberCount === null ? 'hidden' : c.subscriberCount.toLocaleString());
@@ -1092,6 +1260,7 @@ function openChannelBreakdown(channelId, channelTitle) {
       html += evCell('Uploads / week (recent)', c.uploadsPerWeekRecent === null ? 'n/a' : c.uploadsPerWeekRecent);
       html += evCell('Shorts share (recent)', c.shortsShareRecent === null ? 'n/a' : Math.round(c.shortsShareRecent * 100) + '%');
       html += '</div>';
+      html += '<div class="muted-lo" style="font-size:11.5px;margin-bottom:14px;">Score formula: ' + escapeHtml(c.channelHealthFormula) + '</div>';
       if (c.topVideosInSample && c.topVideosInSample.length) {
         html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Top videos in its ' + c.sampledRecentUploads + ' most recent uploads:</b></div>';
         html += '<ul style="margin:0;padding-left:18px;font-size:13.5px;">';
