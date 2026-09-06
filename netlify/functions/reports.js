@@ -545,6 +545,8 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
     .map(function (e) { return { query: e.query, reason: typeof e.reason === 'string' ? e.reason : '' }; });
 
   if (!Array.isArray(parsed.crossCuttingThemes)) parsed.crossCuttingThemes = [];
+  // A single-run report cannot logically have a theme that crosses items.
+  if (items.length < 2) parsed.crossCuttingThemes = [];
   if (!Array.isArray(parsed.recommendedNextActions)) parsed.recommendedNextActions = [];
   if (!parsed.verdict || typeof parsed.verdict !== 'object') parsed.verdict = { label: 'WATCH', reason: parsed.overview };
   if (['GO', 'CONDITIONAL GO', 'WATCH', 'NO-GO'].indexOf(parsed.verdict.label) === -1) parsed.verdict.label = 'WATCH';

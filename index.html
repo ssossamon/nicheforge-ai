@@ -157,11 +157,11 @@
   .evcell .v{font-family:'Space Grotesk';font-size:19px;margin-top:2px;}
   .opp{border-top:1px solid var(--line-paper);padding:16px 0;}
   .report-deck{background:#eff6ff;padding:24px;border-radius:18px;color:#172033;}
-  .report-cover{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 72%,#f97316 145%);color:#fff;padding:34px;border-radius:18px;box-shadow:0 18px 45px rgba(29,78,216,.18);margin-bottom:18px;}
+  .report-cover{background:linear-gradient(135deg,#312e81 0%,#4c1d95 54%,#581c87 100%);color:#fff;padding:34px;border-radius:18px;box-shadow:0 18px 45px rgba(49,46,129,.22);margin-bottom:18px;}
   .report-cover .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;opacity:.82;}
   .report-cover h2{font-size:30px;line-height:1.08;margin:9px 0 12px;color:#fff;}
-  .report-cover p{font-size:15px;line-height:1.65;max-width:760px;opacity:.94;}
-  .report-verdict{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;margin-top:12px;}
+  .report-cover p{font-size:15px;line-height:1.65;max-width:760px;color:#fff;opacity:1;}
+  .report-verdict{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#312e81;border:1px solid #fff;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;margin-top:12px;}
   .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0;}
   .report-card,.report-deck .opp{background:#fff;border:1px solid #dbeafe;border-radius:15px;padding:20px;box-shadow:0 8px 24px rgba(30,64,175,.06);}
   .report-deck .opp{margin:14px 0;}
@@ -169,7 +169,7 @@
   .report-card h4,.report-deck .opp h4{font-size:17px;color:#172033;margin:0 0 8px;}
   .report-card p,.report-deck .opp p,.report-deck li{font-size:14px;line-height:1.6;}
   .report-score-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
-  .report-score-pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 11px;font-size:12px;}
+  .report-score-pill{background:rgba(15,23,42,.28);border:1px solid rgba(255,255,255,.55);color:#fff;border-radius:10px;padding:8px 11px;font-size:12px;}
   .report-section-title{font-size:22px;margin:28px 0 12px;color:#172033;}
   .report-timeline{display:grid;gap:10px;}
   .report-step{display:grid;grid-template-columns:95px 1fr;gap:14px;background:#fff;border-left:4px solid #7c3aed;border-radius:12px;padding:15px 17px;}
@@ -2476,6 +2476,7 @@ function exportDossierToPdf(result) {
   var maxWidth = pageWidth - margin * 2;
 
   function addLine(text, size, style, gap) {
+    text = String(text || '').replace(/[\u2012\u2013\u2014]/g, '-').replace(/\u2022/g, '-');
     doc.setFontSize(size);
     doc.setFont('helvetica', style || 'normal');
     var lines = doc.splitTextToSize(text, maxWidth);
@@ -3098,7 +3099,7 @@ function openReportView(report) {
     html += '<ul style="margin:0;padding-left:18px;font-size:13.5px;">';
     for (var ch = 0; ch < report.competitiveLandscape.topChannels.length; ch++) {
       var chan = report.competitiveLandscape.topChannels[ch];
-      html += '<li>' + escapeHtml(chan.title) + ' \u2014 seen in ' + chan.appearances + ' item(s): ' + escapeHtml(chan.seenIn.join(', ')) + '</li>';
+      html += '<li>' + escapeHtml(chan.title) + ' \u2014 ' + chan.appearances + ' evidence appearance(s) across ' + chan.seenIn.length + ' run(s): ' + escapeHtml(chan.seenIn.join(', ')) + '</li>';
     }
     html += '</ul>';
   }
@@ -3152,6 +3153,7 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   var maxWidth = pageWidth - margin * 2;
 
   function addLine(text, size, style, gap) {
+    text = String(text || '').replace(/[\u2012\u2013\u2014]/g, '-').replace(/\u2022/g, '-');
     doc.setFontSize(size);
     doc.setFont('helvetica', style || 'normal');
     var lines = doc.splitTextToSize(text, maxWidth);
@@ -3163,9 +3165,19 @@ el('btn-export-report-pdf').addEventListener('click', function () {
     y += gap || 4;
   }
 
-  addLine('NicheForge AI Report', 12, 'italic', 2);
-  addLine(report.title, 20, 'bold', 4);
-  addLine(report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleDateString(), 10, 'normal', 14);
+  function ensureSpace(points) {
+    if (y + points > 740) { doc.addPage(); y = margin; }
+  }
+
+  doc.setFillColor(49, 46, 129);
+  doc.rect(0, 0, pageWidth, 158, 'F');
+  doc.setTextColor(255, 255, 255);
+  y = 42;
+  addLine('NICHEFORGE AI - OPPORTUNITY INTELLIGENCE', 10, 'bold', 8);
+  addLine(report.title, 22, 'bold', 8);
+  addLine(report.items.length + (report.items.length === 1 ? ' source' : ' sources') + ' - generated ' + new Date(report.createdAt).toLocaleDateString(), 10, 'normal', 0);
+  doc.setTextColor(23, 32, 51);
+  y = 188;
 
   addLine('EXECUTIVE SUMMARY', 11, 'bold', 8);
   if (s.verdict && s.verdict.label) {
@@ -3230,6 +3242,7 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   }
 
   if (s.next30Days && s.next30Days.length) {
+    ensureSpace(100);
     addLine('30-day action plan', 13, 'bold', 4);
     for (var nd = 0; nd < s.next30Days.length; nd++) {
       var step = s.next30Days[nd];
@@ -3263,7 +3276,7 @@ el('btn-export-report-pdf').addEventListener('click', function () {
     addLine('Competitive landscape', 13, 'bold', 6);
     for (var ch = 0; ch < report.competitiveLandscape.topChannels.length; ch++) {
       var chan = report.competitiveLandscape.topChannels[ch];
-      addLine(chan.title + ' \u2014 seen in ' + chan.appearances + ' item(s): ' + chan.seenIn.join(', '), 9, 'normal', 2);
+      addLine(chan.title + ' - ' + chan.appearances + ' evidence appearance(s) across ' + chan.seenIn.length + ' run(s): ' + chan.seenIn.join(', '), 9, 'normal', 2);
     }
     y += 8;
   }
