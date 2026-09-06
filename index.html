@@ -442,11 +442,23 @@ function escapeHtml(str) {
 
 // ---- email gate ------------------------------------------------------
 
+var OWNER_KEY = 'NFORGE-ADM-SCOTT-2026';
+
 function ensureEmail(callback) {
   var stored = lsGet('email');
   if (stored) { callback(stored); return; }
   var fieldEmail = el('f-email').value.trim();
   if (fieldEmail) { callback(fieldEmail); return; }
+  var activeLicense = (lsGet('license_key') || '').trim().toUpperCase();
+  if (activeLicense === OWNER_KEY) {
+    // Owner testing with the admin key active — skip the lead-capture
+    // modal entirely, no need to collect your own email for your own tool.
+    var ownerEmail = 'owner@nicheforge.local';
+    lsSet('email', ownerEmail);
+    el('f-email').value = ownerEmail;
+    callback(ownerEmail);
+    return;
+  }
   el('email-modal').className = 'modal-veil open';
   var handler = function () {
     var val = el('modal-email').value.trim();
@@ -532,12 +544,15 @@ function doScan(query, email) {
     return;
   }
 
-  // fire-and-forget lead capture — never blocks the scan
-  fetch('/api/capture-lead', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email, source: 'scan_form' })
-  }).catch(function () {});
+  // fire-and-forget lead capture — never blocks the scan. Skipped for the
+  // owner's own testing placeholder email so it never pollutes the lead list.
+  if (email !== 'owner@nicheforge.local') {
+    fetch('/api/capture-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'scan_form' })
+    }).catch(function () {});
+  }
 
   var btn = el('btn-scan');
   btn.disabled = true;
