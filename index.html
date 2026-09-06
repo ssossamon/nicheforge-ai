@@ -151,6 +151,47 @@
   .gapbox{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:14px 16px;margin-top:16px;font-size:14px;}
   .gapbox b{color:var(--brass-dim);}
 
+  /* ---- Playbook document (Gamma-style structured document) ---- */
+  .pb-doc{background:var(--paper);border-radius:6px;overflow:hidden;}
+  .pb-hero{background:linear-gradient(135deg,var(--ink) 0%,var(--ink-2) 100%);color:var(--text-hi);padding:30px 30px 24px;}
+  .pb-eyebrow{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass);margin-bottom:10px;font-weight:600;}
+  .pb-eyebrow .pb-eyebrow-mark{width:8px;height:8px;border-radius:50%;background:var(--brass);flex:none;}
+  .pb-hero h2{font-family:'Space Grotesk';font-weight:700;font-size:25px;margin:0 0 8px;line-height:1.25;color:#fff;}
+  .pb-hero .pb-source{font-size:12.5px;color:var(--muted-hi);}
+  .pb-hero-stats{display:flex;gap:26px;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.14);}
+  .pb-hero-stat .num{font-family:'Space Grotesk';font-weight:700;font-size:22px;color:var(--brass);line-height:1;}
+  .pb-hero-stat .lbl{font-size:10.5px;color:var(--muted-hi);text-transform:uppercase;letter-spacing:0.05em;margin-top:4px;}
+  .pb-doc-body{padding:26px 28px 28px;}
+  .pb-section-label{display:flex;align-items:center;gap:10px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--brass-dim);margin:26px 0 14px;}
+  .pb-section-label:first-child{margin-top:0;}
+  .pb-section-badge{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--brass-dim);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-size:12px;font-weight:700;color:var(--brass-dim);flex:none;}
+  .tactic-card{background:#fff;border:1px solid var(--line-paper);border-left:3px solid var(--moss);border-radius:4px;padding:14px 16px;margin-bottom:10px;}
+  .tactic-card .tactic-head{display:flex;align-items:baseline;gap:9px;margin-bottom:6px;}
+  .tactic-card .tactic-num{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--moss);color:#fff;font-size:10.5px;font-weight:700;flex:none;}
+  .tactic-card h4{font-size:14.5px;margin:0;}
+  .tactic-card p{font-size:13px;color:var(--muted-lo);margin:4px 0 0;}
+  .mechanic-box{background:var(--ink);color:var(--text-hi);border-radius:5px;padding:18px 20px;margin-bottom:14px;}
+  .mechanic-box .mb-label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--brass);margin-bottom:8px;font-weight:700;}
+  .mechanic-box p{margin:0;font-size:14px;line-height:1.55;}
+  .step-timeline{position:relative;margin-top:4px;}
+  .step-card{position:relative;padding:0 0 22px 38px;border-left:2px solid var(--line-paper);}
+  .step-card:last-child{border-left-color:transparent;padding-bottom:2px;}
+  .step-card .step-num{position:absolute;left:-16px;top:-2px;width:32px;height:32px;border-radius:50%;background:var(--brass);color:var(--ink);font-family:'Space Grotesk';font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .step-card .step-action{font-size:14px;font-weight:700;margin-bottom:3px;}
+  .step-card .step-time{display:inline-block;background:var(--paper-2);border:1px solid var(--line-paper);border-radius:3px;padding:1px 8px;font-size:10.5px;color:var(--muted-lo);font-weight:600;margin-left:8px;vertical-align:middle;}
+  .step-card .step-details{font-size:13px;color:var(--muted-lo);margin-top:3px;}
+  .pb-callout-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px;}
+  .pb-callout{border-radius:4px;padding:14px 16px;font-size:12.5px;}
+  .pb-callout.metrics{background:#E9F3EC;border:1px solid #C5E3CE;}
+  .pb-callout.pitfalls{background:#F7E9E4;border:1px solid #E8C9BC;}
+  .pb-callout b{display:block;margin-bottom:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;}
+  .pb-callout.metrics b{color:#2E7D4F;}
+  .pb-callout.pitfalls b{color:var(--rust);}
+  .pb-callout ul{margin:0;padding-left:16px;}
+  .pb-callout li{margin-bottom:4px;}
+  .pb-prereqs{font-size:12.5px;color:var(--muted-lo);background:var(--paper-2);border-radius:4px;padding:10px 14px;margin-bottom:16px;}
+  @media (max-width:640px){.pb-callout-grid{grid-template-columns:1fr;}.pb-hero-stats{flex-wrap:wrap;gap:16px;}}
+
   /* license box */
   .license-box{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:22px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;}
   .license-box .field{margin:0;flex:1;min-width:220px;}
@@ -601,9 +642,10 @@
 </div>
 
 <div class="modal-veil" id="playbook-view-modal">
-  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
+  <div class="modal" style="max-width:700px;max-height:88vh;overflow-y:auto;padding:0;">
     <div id="playbook-view-body">Loading…</div>
-    <div style="display:flex;gap:10px;margin-top:16px;">
+    <div style="display:flex;gap:10px;padding:16px 24px 22px;">
+      <button class="btn btn-ghost" id="btn-export-playbook-pdf" type="button">Export PDF</button>
       <button class="btn btn-ghost" id="btn-copy-playbook" type="button">Copy as text</button>
       <button class="btn btn-ghost" id="btn-close-playbook-view-modal" type="button">Close</button>
     </div>
@@ -1345,47 +1387,80 @@ function renderCompetitorAnalysis(data) {
 }
 
 function renderPlaybookResult(sourceLabel, result, meta) {
-  var html = '<div class="dossier"><div class="dossier-head">';
-  html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(result.playbook ? result.playbook.title : 'Playbook') + '</h3><div class="muted-lo" style="font-size:13px;">' + escapeHtml(sourceLabel) + '</div></div>';
-  html += '</div><div class="dossier-body">';
+  CURRENT_PLAYBOOK_FOR_COPY = { sourceLabel: sourceLabel, result: result };
+  var html = buildPlaybookDocumentHtml(sourceLabel, result);
+  html += '<div style="display:flex;gap:10px;margin-top:18px;">';
+  html += '<button class="btn btn-ghost" id="btn-export-current-playbook-pdf" type="button">Export PDF</button>';
+  html += '<button class="btn btn-ghost" id="btn-copy-current-playbook" type="button">Copy as text</button>';
+  html += '</div>';
+  html += scansRemainingNote(meta);
+  showResults(html);
+  el('btn-copy-current-playbook').addEventListener('click', function () { copyPlaybookAsText(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result); });
+  el('btn-export-current-playbook-pdf').addEventListener('click', function () { exportPlaybookToPdf(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result); });
+}
 
-  html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>How did they do that?</b></div>';
+// Single shared builder for the polished, document-style playbook — used by
+// both the inline result (just after dissecting) and the "open saved
+// playbook" modal, so the two never drift out of sync.
+function buildPlaybookDocumentHtml(sourceLabel, result) {
+  var tacticCount = (result.whatTheyDid || []).length;
+  var stepCount = result.playbook && result.playbook.steps ? result.playbook.steps.length : 0;
+  var title = result.playbook && result.playbook.title ? result.playbook.title : 'Playbook';
+
+  var html = '<div class="pb-doc">';
+  html += '<div class="pb-hero">';
+  html += '<div class="pb-eyebrow"><span class="pb-eyebrow-mark"></span>Reverse-Engineered Playbook</div>';
+  html += '<h2>' + escapeHtml(title) + '</h2>';
+  html += '<div class="pb-source">Source: ' + escapeHtml(sourceLabel) + '</div>';
+  html += '<div class="pb-hero-stats">';
+  html += '<div class="pb-hero-stat"><div class="num">' + tacticCount + '</div><div class="lbl">Tactics Found</div></div>';
+  html += '<div class="pb-hero-stat"><div class="num">' + stepCount + '</div><div class="lbl">Playbook Steps</div></div>';
+  html += '</div></div>';
+
+  html += '<div class="pb-doc-body">';
+
+  html += '<div class="pb-section-label"><span class="pb-section-badge">1</span>How did they do that?</div>';
   for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
     var t = result.whatTheyDid[i];
-    html += '<div class="opp"><h4>' + escapeHtml(t.tactic) + '</h4><p><b>What they did:</b> ' + escapeHtml(t.howTheyDidIt) + '</p><p style="color:var(--muted-lo);"><b>Why it works:</b> ' + escapeHtml(t.whyItWorks) + '</p></div>';
+    html += '<div class="tactic-card"><div class="tactic-head"><span class="tactic-num">' + (i + 1) + '</span><h4>' + escapeHtml(t.tactic) + '</h4></div>';
+    html += '<p><b>What they did:</b> ' + escapeHtml(t.howTheyDidIt) + '</p>';
+    html += '<p><b>Why it works:</b> ' + escapeHtml(t.whyItWorks) + '</p></div>';
   }
 
-  html += '<div class="gapbox"><b>How can you do that?</b> ' + escapeHtml(result.replicableMechanic) + '</div>';
+  html += '<div class="pb-section-label"><span class="pb-section-badge">2</span>How can you do that?</div>';
+  html += '<div class="mechanic-box"><div class="mb-label">The replicable mechanic</div><p>' + escapeHtml(result.replicableMechanic) + '</p></div>';
   if (result.adaptationNotes && result.adaptationNotes.length) {
-    html += '<ul style="margin:10px 0 20px;padding-left:18px;font-size:13.5px;">';
-    for (var a = 0; a < result.adaptationNotes.length; a++) html += '<li>' + escapeHtml(result.adaptationNotes[a]) + '</li>';
+    html += '<ul style="margin:0 0 4px;padding-left:18px;font-size:13.5px;color:var(--muted-lo);">';
+    for (var a = 0; a < result.adaptationNotes.length; a++) html += '<li style="margin-bottom:4px;">' + escapeHtml(result.adaptationNotes[a]) + '</li>';
     html += '</ul>';
   }
 
   if (result.playbook) {
     var p = result.playbook;
-    html += '<div class="muted-lo" style="font-size:13px;margin:18px 0 8px;"><b>' + escapeHtml(p.title || 'Playbook') + '</b> \u2014 ' + escapeHtml(p.objective || '') + '</div>';
+    html += '<div class="pb-section-label"><span class="pb-section-badge">3</span>' + escapeHtml(p.title || 'The Playbook') + '</div>';
+    if (p.objective) html += '<p style="font-size:13.5px;color:var(--muted-lo);margin:-6px 0 14px;">' + escapeHtml(p.objective) + '</p>';
     if (p.prerequisites && p.prerequisites.length) {
-      html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:8px;">Before you start: ' + p.prerequisites.map(escapeHtml).join('; ') + '</div>';
+      html += '<div class="pb-prereqs"><b>Before you start:</b> ' + p.prerequisites.map(escapeHtml).join(' \u00B7 ') + '</div>';
     }
-    html += '<ol style="margin:0 0 16px;padding-left:20px;">';
+    html += '<div class="step-timeline">';
     for (var s = 0; s < (p.steps || []).length; s++) {
       var step = p.steps[s];
-      html += '<li style="margin-bottom:12px;font-size:13.5px;"><b>' + escapeHtml(step.action) + '</b> <span class="muted-lo">(' + escapeHtml(step.estimatedTime) + ')</span><div style="color:var(--muted-lo);margin-top:2px;">' + escapeHtml(step.details) + '</div></li>';
+      html += '<div class="step-card"><div class="step-num">' + (step.stepNumber || s + 1) + '</div>';
+      html += '<div class="step-action">' + escapeHtml(step.action) + '<span class="step-time">' + escapeHtml(step.estimatedTime) + '</span></div>';
+      html += '<div class="step-details">' + escapeHtml(step.details) + '</div></div>';
     }
-    html += '</ol>';
-    if (p.successMetrics && p.successMetrics.length) html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:6px;"><b>Success metrics:</b> ' + p.successMetrics.map(escapeHtml).join('; ') + '</div>';
-    if (p.commonPitfalls && p.commonPitfalls.length) html += '<div class="muted-lo" style="font-size:12.5px;"><b>Common pitfalls:</b> ' + p.commonPitfalls.map(escapeHtml).join('; ') + '</div>';
+    html += '</div>';
+
+    if ((p.successMetrics && p.successMetrics.length) || (p.commonPitfalls && p.commonPitfalls.length)) {
+      html += '<div class="pb-callout-grid">';
+      html += '<div class="pb-callout metrics"><b>How you\u2019ll know it\u2019s working</b><ul>' + (p.successMetrics || []).map(function (m) { return '<li>' + escapeHtml(m) + '</li>'; }).join('') + '</ul></div>';
+      html += '<div class="pb-callout pitfalls"><b>Common pitfalls</b><ul>' + (p.commonPitfalls || []).map(function (m) { return '<li>' + escapeHtml(m) + '</li>'; }).join('') + '</ul></div>';
+      html += '</div>';
+    }
   }
 
-  html += scansRemainingNote(meta);
-  html += '<div style="display:flex;gap:10px;margin-top:16px;">';
-  html += '<button class="btn btn-ghost" id="btn-copy-current-playbook" type="button">Copy as text</button>';
-  html += '</div>';
   html += '</div></div>';
-  CURRENT_PLAYBOOK_FOR_COPY = { sourceLabel: sourceLabel, result: result };
-  showResults(html);
-  el('btn-copy-current-playbook').addEventListener('click', function () { copyPlaybookAsText(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result); });
+  return html;
 }
 
 function playbookToPlainText(sourceLabel, result) {
@@ -2806,30 +2881,11 @@ function openPlaybookViewModal(id) {
         return;
       }
       CURRENT_PLAYBOOK_FOR_COPY = { sourceLabel: data.playbook.sourceLabel, result: data.playbook.result };
-      el('playbook-view-body').innerHTML = buildPlaybookViewHtml(data.playbook.sourceLabel, data.playbook.result);
+      el('playbook-view-body').innerHTML = buildPlaybookDocumentHtml(data.playbook.sourceLabel, data.playbook.result);
     })
     .catch(function (e) {
       el('playbook-view-body').innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
     });
-}
-
-function buildPlaybookViewHtml(sourceLabel, result) {
-  var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(result.playbook ? result.playbook.title : 'Playbook') + '</h3>';
-  html += '<p class="muted-lo" style="font-size:13px;margin-bottom:16px;">' + escapeHtml(sourceLabel) + '</p>';
-  for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
-    var t = result.whatTheyDid[i];
-    html += '<div class="opp"><h4>' + escapeHtml(t.tactic) + '</h4><p>' + escapeHtml(t.howTheyDidIt) + '</p></div>';
-  }
-  html += '<div class="gapbox"><b>How you can do it:</b> ' + escapeHtml(result.replicableMechanic) + '</div>';
-  if (result.playbook && result.playbook.steps) {
-    html += '<ol style="margin:16px 0 0;padding-left:20px;">';
-    for (var s = 0; s < result.playbook.steps.length; s++) {
-      var step = result.playbook.steps[s];
-      html += '<li style="margin-bottom:10px;font-size:13.5px;"><b>' + escapeHtml(step.action) + '</b> <span class="muted-lo">(' + escapeHtml(step.estimatedTime) + ')</span><div style="color:var(--muted-lo);">' + escapeHtml(step.details) + '</div></li>';
-    }
-    html += '</ol>';
-  }
-  return html;
 }
 
 el('btn-close-playbook-view-modal').addEventListener('click', function () {
@@ -2840,6 +2896,262 @@ el('btn-copy-playbook').addEventListener('click', function () {
   if (!CURRENT_PLAYBOOK_FOR_COPY) return;
   copyPlaybookAsText(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result);
 });
+
+el('btn-export-playbook-pdf').addEventListener('click', function () {
+  if (!CURRENT_PLAYBOOK_FOR_COPY) return;
+  exportPlaybookToPdf(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result);
+});
+
+function exportPlaybookToPdf(sourceLabel, result) {
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFCtor) { alert('PDF library did not load. Check your internet connection and try again.'); return; }
+
+  var INK = [14, 27, 42];
+  var INK2 = [20, 38, 56];
+  var BRASS = [217, 164, 65];
+  var BRASS_DIM = [140, 108, 46];
+  var MOSS = [95, 169, 122];
+  var RUST = [193, 97, 63];
+  var PAPER2 = [239, 234, 219];
+  var MUTED = [91, 85, 70];
+  var LINE = [216, 207, 182];
+
+  var doc = new jsPDFCtor({ unit: 'pt', format: 'letter' });
+  var margin = 46;
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var pageHeight = doc.internal.pageSize.getHeight();
+  var contentWidth = pageWidth - margin * 2;
+  var y = margin;
+
+  function checkPageBreak(neededHeight) {
+    if (y + neededHeight > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  }
+
+  function wrapped(text, size, style, width) {
+    doc.setFont('helvetica', style || 'normal');
+    doc.setFontSize(size);
+    return doc.splitTextToSize(String(text || ''), width);
+  }
+
+  var title = result.playbook && result.playbook.title ? result.playbook.title : 'Playbook';
+  var tacticCount = (result.whatTheyDid || []).length;
+  var stepCount = result.playbook && result.playbook.steps ? result.playbook.steps.length : 0;
+
+  // ---- Hero header banner (full-bleed navy block) ----
+  var titleLines = wrapped(title, 20, 'bold', pageWidth - 60);
+  var heroHeight = 96 + (titleLines.length - 1) * 22;
+  doc.setFillColor(INK[0], INK[1], INK[2]);
+  doc.rect(0, 0, pageWidth, heroHeight, 'F');
+
+  doc.setFillColor(BRASS[0], BRASS[1], BRASS[2]);
+  doc.circle(margin + 3, 30, 3, 'F');
+  doc.setTextColor(BRASS[0], BRASS[1], BRASS[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('REVERSE-ENGINEERED PLAYBOOK', margin + 12, 34);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  var titleY = 58;
+  for (var tl = 0; tl < titleLines.length; tl++) {
+    doc.text(titleLines[tl], margin, titleY);
+    titleY += 22;
+  }
+
+  doc.setTextColor(190, 197, 209);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Source: ' + sourceLabel, margin, titleY + 4);
+
+  var statsY = heroHeight - 18;
+  doc.setDrawColor(60, 72, 90);
+  doc.line(margin, statsY - 20, pageWidth - margin, statsY - 20);
+  doc.setTextColor(BRASS[0], BRASS[1], BRASS[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(String(tacticCount), margin, statsY);
+  doc.text(String(stepCount), margin + 130, statsY);
+  doc.setTextColor(190, 197, 209);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('TACTICS FOUND', margin, statsY + 11);
+  doc.text('PLAYBOOK STEPS', margin + 130, statsY + 11);
+
+  y = heroHeight + 30;
+  doc.setTextColor(14, 27, 42);
+
+  function sectionLabel(num, text) {
+    checkPageBreak(30);
+    doc.setDrawColor(BRASS_DIM[0], BRASS_DIM[1], BRASS_DIM[2]);
+    doc.setLineWidth(1.2);
+    doc.circle(margin + 8, y - 3, 8, 'S');
+    doc.setTextColor(BRASS_DIM[0], BRASS_DIM[1], BRASS_DIM[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(String(num), margin + 8, y, { align: 'center' });
+    doc.setFontSize(10.5);
+    doc.text(text.toUpperCase(), margin + 24, y);
+    doc.setTextColor(14, 27, 42);
+    y += 20;
+  }
+
+  // ---- Section 1: tactics ----
+  sectionLabel(1, 'How did they do that?');
+  for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
+    var t = result.whatTheyDid[i];
+    var whatLines = wrapped('What they did: ' + t.howTheyDidIt, 10, 'normal', contentWidth - 20);
+    var whyLines = wrapped('Why it works: ' + t.whyItWorks, 10, 'normal', contentWidth - 20);
+    var cardHeight = 22 + whatLines.length * 13 + whyLines.length * 13 + 12;
+    checkPageBreak(cardHeight);
+    doc.setFillColor(MOSS[0], MOSS[1], MOSS[2]);
+    doc.rect(margin, y - 12, 3, cardHeight, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text((i + 1) + '. ' + t.tactic, margin + 12, y);
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    for (var wl = 0; wl < whatLines.length; wl++) { doc.text(whatLines[wl], margin + 12, y); y += 13; }
+    doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+    for (var wy = 0; wy < whyLines.length; wy++) { doc.text(whyLines[wy], margin + 12, y); y += 13; }
+    doc.setTextColor(14, 27, 42);
+    y += 12;
+  }
+
+  // ---- Section 2: mechanic ----
+  sectionLabel(2, 'How can you do that?');
+  var mechLines = wrapped(result.replicableMechanic, 10.5, 'normal', contentWidth - 32);
+  var mechHeight = 34 + mechLines.length * 14;
+  checkPageBreak(mechHeight);
+  doc.setFillColor(INK[0], INK[1], INK[2]);
+  doc.roundedRect(margin, y - 14, contentWidth, mechHeight, 5, 5, 'F');
+  doc.setTextColor(BRASS[0], BRASS[1], BRASS[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('THE REPLICABLE MECHANIC', margin + 16, y + 2);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  var my = y + 18;
+  for (var ml = 0; ml < mechLines.length; ml++) { doc.text(mechLines[ml], margin + 16, my); my += 14; }
+  y += mechHeight + 16;
+  doc.setTextColor(14, 27, 42);
+
+  if (result.adaptationNotes && result.adaptationNotes.length) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+    for (var an = 0; an < result.adaptationNotes.length; an++) {
+      var noteLines = wrapped('\u2022 ' + result.adaptationNotes[an], 10, 'normal', contentWidth - 10);
+      checkPageBreak(noteLines.length * 13 + 4);
+      for (var nl = 0; nl < noteLines.length; nl++) { doc.text(noteLines[nl], margin, y); y += 13; }
+    }
+    doc.setTextColor(14, 27, 42);
+    y += 8;
+  }
+
+  // ---- Section 3: playbook steps ----
+  if (result.playbook) {
+    var p = result.playbook;
+    sectionLabel(3, p.title || 'The Playbook');
+    if (p.objective) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      var objLines = wrapped(p.objective, 10, 'normal', contentWidth);
+      checkPageBreak(objLines.length * 13 + 8);
+      for (var ol = 0; ol < objLines.length; ol++) { doc.text(objLines[ol], margin, y); y += 13; }
+      doc.setTextColor(14, 27, 42);
+      y += 6;
+    }
+    if (p.prerequisites && p.prerequisites.length) {
+      var prereqText = 'Before you start: ' + p.prerequisites.join(' \u00B7 ');
+      var prereqLines = wrapped(prereqText, 9.5, 'normal', contentWidth - 20);
+      var prereqHeight = prereqLines.length * 12 + 12;
+      checkPageBreak(prereqHeight);
+      doc.setFillColor(PAPER2[0], PAPER2[1], PAPER2[2]);
+      doc.rect(margin, y - 10, contentWidth, prereqHeight, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      var py = y + 2;
+      for (var pl = 0; pl < prereqLines.length; pl++) { doc.text(prereqLines[pl], margin + 10, py); py += 12; }
+      doc.setTextColor(14, 27, 42);
+      y += prereqHeight + 14;
+    }
+
+    for (var s = 0; s < (p.steps || []).length; s++) {
+      var step = p.steps[s];
+      var actionText = step.action + '  (' + step.estimatedTime + ')';
+      var actionLines = wrapped(actionText, 11, 'bold', contentWidth - 40);
+      var detailLines = wrapped(step.details, 10, 'normal', contentWidth - 40);
+      var stepHeight = actionLines.length * 14 + detailLines.length * 13 + 14;
+      checkPageBreak(stepHeight + 10);
+      doc.setFillColor(BRASS[0], BRASS[1], BRASS[2]);
+      doc.circle(margin + 10, y - 3, 10, 'F');
+      doc.setTextColor(INK[0], INK[1], INK[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(String(step.stepNumber || s + 1), margin + 10, y, { align: 'center' });
+      doc.setFontSize(11);
+      var sy = y - 3;
+      for (var al = 0; al < actionLines.length; al++) { doc.text(actionLines[al], margin + 28, sy); sy += 14; }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var dl = 0; dl < detailLines.length; dl++) { doc.text(detailLines[dl], margin + 28, sy); sy += 13; }
+      doc.setTextColor(14, 27, 42);
+      y = sy + 12;
+    }
+
+    if (p.successMetrics && p.successMetrics.length) {
+      checkPageBreak(20 + p.successMetrics.length * 13);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(46, 125, 79);
+      doc.text('HOW YOU\u2019LL KNOW IT\u2019S WORKING', margin, y);
+      y += 14;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var sm = 0; sm < p.successMetrics.length; sm++) {
+        var smLines = wrapped('\u2022 ' + p.successMetrics[sm], 10, 'normal', contentWidth);
+        checkPageBreak(smLines.length * 13);
+        for (var sml = 0; sml < smLines.length; sml++) { doc.text(smLines[sml], margin, y); y += 13; }
+      }
+      y += 8;
+    }
+
+    if (p.commonPitfalls && p.commonPitfalls.length) {
+      checkPageBreak(20 + p.commonPitfalls.length * 13);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(RUST[0], RUST[1], RUST[2]);
+      doc.text('COMMON PITFALLS', margin, y);
+      y += 14;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      for (var cp = 0; cp < p.commonPitfalls.length; cp++) {
+        var cpLines = wrapped('\u2022 ' + p.commonPitfalls[cp], 10, 'normal', contentWidth);
+        checkPageBreak(cpLines.length * 13);
+        for (var cpl = 0; cpl < cpLines.length; cpl++) { doc.text(cpLines[cpl], margin, y); y += 13; }
+      }
+    }
+  }
+
+  doc.setTextColor(LINE[0], LINE[1], LINE[2]);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  checkPageBreak(20);
+  doc.text('Generated by NicheForge AI', margin, pageHeight - margin + 10);
+
+  doc.save('playbook-' + title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) + '.pdf');
+}
 
 </script>
 </body>
