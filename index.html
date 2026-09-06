@@ -190,6 +190,21 @@
   .pb-callout ul{margin:0;padding-left:16px;}
   .pb-callout li{margin-bottom:4px;}
   .pb-prereqs{font-size:12.5px;color:var(--muted-lo);background:var(--paper-2);border-radius:4px;padding:10px 14px;margin-bottom:16px;}
+  .pb-subheading{font-size:12.5px;font-weight:700;color:var(--ink);margin:16px 0 8px;}
+  .pb-chapter{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line-paper);align-items:flex-start;}
+  .pb-chapter:first-child{border-top:none;}
+  .pb-timestamp-chip{display:inline-block;background:var(--ink);color:var(--brass);font-family:'Space Grotesk';font-size:11px;font-weight:700;padding:3px 9px;border-radius:3px;text-decoration:none;flex:none;white-space:nowrap;}
+  .pb-timestamp-chip:hover{background:var(--ink-2);}
+  .pb-timestamp-chip.disabled{background:var(--paper-2);color:var(--muted-lo);cursor:default;}
+  .pb-claim-row{display:flex;gap:10px;align-items:baseline;padding:6px 0;font-size:13.5px;}
+  .pb-pain-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line-paper);}
+  .pb-pain-row:first-child{border-top:none;}
+  .pb-severity-badge{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:3px 7px;border-radius:3px;flex:none;margin-top:2px;}
+  .pb-severity-high{background:#F7E9E4;color:var(--rust);}
+  .pb-severity-medium{background:#FBF3E4;color:var(--brass-dim);}
+  .pb-severity-low{background:#E9F3EC;color:#2E7D4F;}
+  .pb-factcheck{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:12px 14px;font-size:12.5px;margin:10px 0 6px;}
+  .pb-factcheck b{color:var(--brass-dim);}
   @media (max-width:640px){.pb-callout-grid{grid-template-columns:1fr;}.pb-hero-stats{flex-wrap:wrap;gap:16px;}}
 
   /* license box */
@@ -1402,9 +1417,95 @@ function renderPlaybookResult(sourceLabel, result, meta) {
 // Single shared builder for the polished, document-style playbook — used by
 // both the inline result (just after dissecting) and the "open saved
 // playbook" modal, so the two never drift out of sync.
+function timestampChip(time) {
+  if (!time || !time.display) return '<span class="pb-timestamp-chip disabled">\u2014</span>';
+  if (time.url) return '<a href="' + escapeHtml(time.url) + '" target="_blank" rel="noopener" class="pb-timestamp-chip">' + escapeHtml(time.display) + '</a>';
+  return '<span class="pb-timestamp-chip disabled">' + escapeHtml(time.display) + '</span>';
+}
+
+function buildTranscriptIntelligenceHtml(result) {
+  var hasContent = result.summary || (result.chapters && result.chapters.length) || (result.keyClaims && result.keyClaims.length) || (result.painPoints && result.painPoints.length);
+  if (!hasContent) return '';
+
+  var html = '<div class="pb-section-label"><span class="pb-section-badge">1</span>Transcript Intelligence</div>';
+
+  if (result.summary) {
+    html += '<p style="font-size:14px;color:var(--muted-lo);margin:0 0 16px;">' + escapeHtml(result.summary) + '</p>';
+  }
+
+  if (result.chapters && result.chapters.length) {
+    html += '<div class="pb-subheading" style="margin-top:0;">Chapters</div>';
+    for (var c = 0; c < result.chapters.length; c++) {
+      var ch = result.chapters[c];
+      html += '<div class="pb-chapter">' + timestampChip(ch.time);
+      html += '<div><b style="font-size:13.5px;">' + escapeHtml(ch.title) + '</b><div style="font-size:12.5px;color:var(--muted-lo);">' + escapeHtml(ch.description || '') + '</div></div></div>';
+    }
+  }
+
+  if (result.keyClaims && result.keyClaims.length) {
+    html += '<div class="pb-subheading">Key claims</div>';
+    for (var k = 0; k < result.keyClaims.length; k++) {
+      var kc = result.keyClaims[k];
+      html += '<div class="pb-claim-row">' + timestampChip(kc.time) + '<span>' + escapeHtml(kc.claim) + '</span></div>';
+    }
+  }
+
+  if ((result.frameworksAndProcesses && result.frameworksAndProcesses.length) || (result.toolsAndResources && result.toolsAndResources.length)) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0;">';
+    if (result.frameworksAndProcesses && result.frameworksAndProcesses.length) {
+      html += '<div><div class="pb-subheading" style="margin-top:0;">Frameworks &amp; processes</div><ul style="margin:0;padding-left:16px;font-size:13px;color:var(--muted-lo);">';
+      for (var f = 0; f < result.frameworksAndProcesses.length; f++) html += '<li>' + escapeHtml(result.frameworksAndProcesses[f]) + '</li>';
+      html += '</ul></div>';
+    }
+    if (result.toolsAndResources && result.toolsAndResources.length) {
+      html += '<div><div class="pb-subheading" style="margin-top:0;">Tools &amp; resources</div><ul style="margin:0;padding-left:16px;font-size:13px;color:var(--muted-lo);">';
+      for (var tr = 0; tr < result.toolsAndResources.length; tr++) html += '<li>' + escapeHtml(result.toolsAndResources[tr]) + '</li>';
+      html += '</ul></div>';
+    }
+    html += '</div>';
+  }
+
+  if (result.painPoints && result.painPoints.length) {
+    html += '<div class="pb-subheading">Audience pain points</div>';
+    for (var p = 0; p < result.painPoints.length; p++) {
+      var pp = result.painPoints[p];
+      html += '<div class="pb-pain-row"><span class="pb-severity-badge pb-severity-' + escapeHtml(pp.severity) + '">' + escapeHtml(pp.severity) + '</span>';
+      html += '<div style="flex:1;"><div style="font-size:13.5px;">' + escapeHtml(pp.painPoint) + '</div>';
+      if (pp.audienceSegment) html += '<div style="font-size:12px;color:var(--muted-lo);">' + escapeHtml(pp.audienceSegment) + '</div>';
+      html += '</div>' + timestampChip(pp.time) + '</div>';
+    }
+  }
+
+  if (result.desiredOutcomes && result.desiredOutcomes.length) {
+    html += '<div class="pb-subheading">Desired outcomes</div><div style="margin-bottom:6px;">';
+    for (var d = 0; d < result.desiredOutcomes.length; d++) html += '<span class="tichip" style="cursor:default;">' + escapeHtml(result.desiredOutcomes[d]) + '</span> ';
+    html += '</div>';
+  }
+
+  if (result.hookAnalysis && result.hookAnalysis.technique) {
+    html += '<div class="pb-subheading">Hook analysis</div>';
+    html += '<div class="pb-claim-row">' + timestampChip(result.hookAnalysis.time) + '<span><b>' + escapeHtml(result.hookAnalysis.technique) + ':</b> ' + escapeHtml(result.hookAnalysis.description) + '</span></div>';
+  }
+
+  if (result.persuasionDevices && result.persuasionDevices.length) {
+    html += '<div class="pb-subheading">Persuasion devices</div><div style="margin-bottom:6px;">';
+    for (var pd = 0; pd < result.persuasionDevices.length; pd++) html += '<span class="tichip" style="cursor:default;">' + escapeHtml(result.persuasionDevices[pd]) + '</span> ';
+    html += '</div>';
+  }
+
+  if (result.factCheckQueue && result.factCheckQueue.length) {
+    html += '<div class="pb-factcheck"><b>Verify independently before repeating:</b><ul style="margin:6px 0 0;padding-left:16px;">';
+    for (var fc = 0; fc < result.factCheckQueue.length; fc++) html += '<li>' + escapeHtml(result.factCheckQueue[fc]) + '</li>';
+    html += '</ul></div>';
+  }
+
+  return html;
+}
+
 function buildPlaybookDocumentHtml(sourceLabel, result) {
   var tacticCount = (result.whatTheyDid || []).length;
   var stepCount = result.playbook && result.playbook.steps ? result.playbook.steps.length : 0;
+  var chapterCount = (result.chapters || []).length;
   var title = result.playbook && result.playbook.title ? result.playbook.title : 'Playbook';
 
   var html = '<div class="pb-doc">';
@@ -1413,13 +1514,16 @@ function buildPlaybookDocumentHtml(sourceLabel, result) {
   html += '<h2>' + escapeHtml(title) + '</h2>';
   html += '<div class="pb-source">Source: ' + escapeHtml(sourceLabel) + '</div>';
   html += '<div class="pb-hero-stats">';
+  if (chapterCount > 0) html += '<div class="pb-hero-stat"><div class="num">' + chapterCount + '</div><div class="lbl">Chapters</div></div>';
   html += '<div class="pb-hero-stat"><div class="num">' + tacticCount + '</div><div class="lbl">Tactics Found</div></div>';
   html += '<div class="pb-hero-stat"><div class="num">' + stepCount + '</div><div class="lbl">Playbook Steps</div></div>';
   html += '</div></div>';
 
   html += '<div class="pb-doc-body">';
 
-  html += '<div class="pb-section-label"><span class="pb-section-badge">1</span>How did they do that?</div>';
+  html += buildTranscriptIntelligenceHtml(result);
+
+  html += '<div class="pb-section-label"><span class="pb-section-badge">2</span>How did they do that?</div>';
   for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
     var t = result.whatTheyDid[i];
     html += '<div class="tactic-card"><div class="tactic-head"><span class="tactic-num">' + (i + 1) + '</span><h4>' + escapeHtml(t.tactic) + '</h4></div>';
@@ -1427,7 +1531,7 @@ function buildPlaybookDocumentHtml(sourceLabel, result) {
     html += '<p><b>Why it works:</b> ' + escapeHtml(t.whyItWorks) + '</p></div>';
   }
 
-  html += '<div class="pb-section-label"><span class="pb-section-badge">2</span>How can you do that?</div>';
+  html += '<div class="pb-section-label"><span class="pb-section-badge">3</span>How can you do that?</div>';
   html += '<div class="mechanic-box"><div class="mb-label">The replicable mechanic</div><p>' + escapeHtml(result.replicableMechanic) + '</p></div>';
   if (result.adaptationNotes && result.adaptationNotes.length) {
     html += '<ul style="margin:0 0 4px;padding-left:18px;font-size:13.5px;color:var(--muted-lo);">';
@@ -1437,7 +1541,7 @@ function buildPlaybookDocumentHtml(sourceLabel, result) {
 
   if (result.playbook) {
     var p = result.playbook;
-    html += '<div class="pb-section-label"><span class="pb-section-badge">3</span>' + escapeHtml(p.title || 'The Playbook') + '</div>';
+    html += '<div class="pb-section-label"><span class="pb-section-badge">4</span>' + escapeHtml(p.title || 'The Playbook') + '</div>';
     if (p.objective) html += '<p style="font-size:13.5px;color:var(--muted-lo);margin:-6px 0 14px;">' + escapeHtml(p.objective) + '</p>';
     if (p.prerequisites && p.prerequisites.length) {
       html += '<div class="pb-prereqs"><b>Before you start:</b> ' + p.prerequisites.map(escapeHtml).join(' \u00B7 ') + '</div>';

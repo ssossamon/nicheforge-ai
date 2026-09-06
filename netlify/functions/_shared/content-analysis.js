@@ -376,10 +376,76 @@ async function fetchTranscript(videoId) {
   }
 }
 
+// Same public caption source as fetchTranscript, but keeps each line's real
+// start/duration instead of flattening to plain text — needed for real
+// timestamped chapters rather than an AI-guessed outline.
+async function fetchTranscriptWithTimestamps(videoId) {
+  try {
+    const listRes = await fetch('https://www.youtube.com/api/timedtext?type=list&v=' + videoId);
+    const listXml = await listRes.text();
+    if (!listXml || listXml.indexOf('<track') === -1) return null;
+
+    const langMatch = listXml.match(/lang_code="([^"]+)"/);
+    const lang = langMatch ? langMatch[1] : 'en';
+
+    const trackRes = await fetch('https://www.youtube.com/api/timedtext?v=' + videoId + '&lang=' + encodeURIComponent(lang));
+    const trackXml = await trackRes.text();
+    if (!trackXml) return null;
+
+    const textTagMatches = trackXml.match(/<text[^>]*>[\s\S]*?<\/text>/g);
+    if (!textTagMatches || textTagMatches.length === 0) return null;
+
+    function decodeEntities(s) {
+      return s
+        .replace(/<[^>]+>/g, '')
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&gt;/g, '>')
+        .replace(/&lt;/g, '<')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const segments = textTagMatches
+      .map(function (tag) {
+        const startMatch = tag.match(/start="([\d.]+)"/);
+        const durMatch = tag.match(/dur="([\d.]+)"/);
+        const innerMatch = tag.match(/<text[^>]*>([\s\S]*?)<\/text>/);
+        const text = innerMatch ? decodeEntities(innerMatch[1]) : '';
+        return {
+          start: startMatch ? parseFloat(startMatch[1]) : 0,
+          dur: durMatch ? parseFloat(durMatch[1]) : 0,
+          text: text
+        };
+      })
+      .filter(function (seg) { return seg.text.length > 0; });
+
+    if (segments.length === 0) return null;
+
+    const fullText = segments.map(function (s) { return s.text; }).join(' ').replace(/\s+/g, ' ').trim();
+
+    return { segments: segments, fullText: fullText.slice(0, 10000) };
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatTimestamp(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = function (n) { return n < 10 ? '0' + n : String(n); };
+  return h > 0 ? h + ':' + pad(m) + ':' + pad(sec) : m + ':' + pad(sec);
+}
+
 module.exports = {
   detectInputType: detectInputType,
   resolveChannelId: resolveChannelId,
   gatherChannelEvidence: gatherChannelEvidence,
   gatherVideoEvidence: gatherVideoEvidence,
+  fetchTranscriptWithTimestamps: fetchTranscriptWithTimestamps,
+  formatTimestamp: formatTimestamp,
   fetchTranscript: fetchTranscript
 };

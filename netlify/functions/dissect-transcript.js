@@ -100,13 +100,14 @@ async function handleRequest(event) {
     unlimited = unlimited || false;
   }
 
-  let transcriptText;
+  let transcriptInput;
   let sourceLabel;
   let videoTitle = null;
+  let videoId = null;
 
   if (detected.type === 'video') {
-    transcriptText = await contentAnalysis.fetchTranscript(detected.videoId);
-    if (!transcriptText) {
+    const fetched = await contentAnalysis.fetchTranscriptWithTimestamps(detected.videoId);
+    if (!fetched) {
       return http.fail(
         404,
         'no_captions',
@@ -114,16 +115,18 @@ async function handleRequest(event) {
         'Try a different video, or paste the transcript text directly instead.'
       );
     }
+    transcriptInput = fetched;
+    videoId = detected.videoId;
     videoTitle = await playbookCore.fetchVideoTitle(detected.videoId);
     sourceLabel = videoTitle ? 'YouTube video: "' + videoTitle + '"' : 'YouTube video ' + detected.videoId;
   } else {
-    transcriptText = detected.text;
+    transcriptInput = detected.text;
     sourceLabel = 'Pasted transcript';
   }
 
   let result;
   try {
-    result = await playbookCore.dissectTranscript(aiProvider, aiApiKey, aiModel, transcriptText, sourceLabel);
+    result = await playbookCore.dissectTranscript(aiProvider, aiApiKey, aiModel, transcriptInput, sourceLabel, videoId);
   } catch (e) {
     return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message, e.whatToDoNext, e.rawResponse ? { _diagnostics: { rawAiResponse: e.rawResponse } } : undefined);
   }
