@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NicheForge AI — Real YouTube Data, Ranked Content Opportunities</title>
+<meta name="description" content="NicheForge AI mines real YouTube search data for any topic and uses your own AI provider to surface ranked niche opportunities, content gaps, and video title ideas — no guessing, no fabricated stats." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1B2A;
+    --ink-2:#142638;
+    --ink-3:#1B3049;
+    --paper:#F7F4EC;
+    --paper-2:#EFEADB;
+    --line:#2A415C;
+    --line-paper:#D8CFB6;
+    --brass:#D9A441;
+    --brass-dim:#8C6C2E;
+    --moss:#5FA97A;
+    --rust:#C1613F;
+    --text-lo:#0E1B2A;
+    --text-hi:#EAF0F6;
+    --muted-hi:#9FB2C6;
+    --muted-lo:#5B5546;
+    --radius:3px;
+    --serif-none: 1;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    background:var(--ink);
+    color:var(--text-hi);
+    line-height:1.55;
+  }
+  h1,h2,h3,h4{
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    font-weight:600;
+    margin:0 0 0.4em 0;
+    letter-spacing:-0.01em;
+  }
+  a{color:inherit;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px;}
+  .muted-hi{color:var(--muted-hi);}
+  .muted-lo{color:var(--muted-lo);}
+
+  /* ---------- top nav ---------- */
+  .nav{position:sticky;top:0;z-index:40;background:rgba(14,27,42,0.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk';font-weight:700;font-size:18px;}
+  .brand .mark{width:22px;height:22px;border-radius:50%;border:2px solid var(--brass);position:relative;flex:none;}
+  .brand .mark:before{content:'';position:absolute;inset:5px;border-radius:50%;background:var(--brass);}
+  .navlinks{display:flex;gap:28px;font-size:14px;color:var(--muted-hi);}
+  .navlinks a{text-decoration:none;}
+  .navlinks a:hover{color:var(--text-hi);}
+  .navcta{background:var(--brass);color:var(--ink);padding:9px 16px;border-radius:var(--radius);font-weight:600;font-size:14px;text-decoration:none;}
+
+  /* ---------- hero ---------- */
+  .hero{padding:64px 0 40px;position:relative;overflow:hidden;}
+  .hero:before{
+    content:'';position:absolute;top:-140px;right:-160px;width:520px;height:520px;
+    border-radius:50%;border:1px solid var(--line);opacity:0.5;
+  }
+  .hero:after{
+    content:'';position:absolute;top:-60px;right:-80px;width:340px;height:340px;
+    border-radius:50%;border:1px solid var(--line);opacity:0.5;
+  }
+  .hero-grid{display:grid;grid-template-columns:1.05fr 0.95fr;gap:48px;align-items:start;position:relative;}
+  .hero h1{font-size:44px;line-height:1.08;max-width:560px;}
+  .hero p.lede{font-size:17px;color:var(--muted-hi);max-width:480px;margin-top:14px;}
+  .hero .trust{margin-top:22px;font-size:13px;color:var(--muted-hi);display:flex;gap:18px;flex-wrap:wrap;}
+  .hero .trust span{display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--moss);flex:none;}
+
+  /* ---------- scan panel (the demo itself) ---------- */
+  .scan-panel{background:var(--paper);color:var(--text-lo);border-radius:6px;padding:26px;box-shadow:0 30px 60px -30px rgba(0,0,0,0.6);}
+  .scan-panel h3{font-size:15px;text-transform:none;color:var(--brass-dim);margin-bottom:2px;}
+  .scan-panel .h3sub{font-size:13px;color:var(--muted-lo);margin-bottom:16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted-lo);margin-bottom:5px;}
+  .field input[type=text],.field input[type=email],.field input[type=password],.field select{
+    width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;
+    font-family:inherit;background:#fff;color:var(--text-lo);
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:12px 18px;border-radius:3px;font-weight:600;font-size:14px;border:none;cursor:pointer;
+    font-family:'Inter';
+  }
+  .btn-primary{background:var(--ink);color:#fff;width:100%;}
+  .btn-primary:hover{background:#0A1420;}
+  .btn-primary:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--brass-dim);border:1px solid var(--line-paper);font-size:12.5px;padding:8px 12px;}
+  .helper{font-size:12px;color:var(--muted-lo);margin-top:6px;}
+  .status-line{font-size:13px;margin-top:10px;min-height:18px;}
+  .status-ok{color:#2C7A4B;}
+  .status-bad{color:#B23A2E;}
+
+  /* ---------- sections ---------- */
+  section{padding:64px 0;border-top:1px solid var(--line);}
+  .section-head{max-width:620px;margin-bottom:36px;}
+  .eyebrow{font-size:12.5px;color:var(--brass);font-weight:600;margin-bottom:10px;}
+  .section-head h2{font-size:30px;}
+  .section-head p{color:var(--muted-hi);font-size:15.5px;margin-top:10px;}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
+  .step{border-left:2px solid var(--brass);padding-left:18px;}
+  .step h4{font-size:17px;margin-bottom:6px;}
+  .step p{color:var(--muted-hi);font-size:14.5px;}
+
+  /* evidence example / honesty block */
+  .honesty{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:28px;display:grid;grid-template-columns:1fr 1fr;gap:32px;}
+  .honesty h4{font-size:15px;color:var(--brass);margin-bottom:10px;}
+  .honesty ul{margin:0;padding-left:18px;color:var(--muted-hi);font-size:14.5px;}
+  .honesty li{margin-bottom:8px;}
+
+  /* pricing */
+  .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .plan{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:26px;display:flex;flex-direction:column;}
+  .plan.featured{border-color:var(--brass);position:relative;}
+  .plan .tag{font-size:11.5px;color:var(--brass);font-weight:600;margin-bottom:8px;}
+  .plan h3{font-size:20px;}
+  .plan .price{font-family:'Space Grotesk';font-size:34px;margin:10px 0 4px;}
+  .plan .price small{font-size:14px;color:var(--muted-hi);font-family:'Inter';}
+  .plan ul{list-style:none;margin:16px 0 20px;padding:0;font-size:14px;color:var(--muted-hi);flex:1;}
+  .plan li{padding:6px 0;border-top:1px solid var(--line);}
+  .plan li:first-child{border-top:none;}
+  .paypal-slot{min-height:44px;}
+
+  /* research example (dossier style, not card-kit) */
+  .dossier{background:var(--paper);color:var(--text-lo);border-radius:6px;padding:0;overflow:hidden;}
+  .dossier .dossier-head{padding:20px 24px;border-bottom:1px solid var(--line-paper);display:flex;justify-content:space-between;align-items:baseline;}
+  .dossier .score{font-family:'Space Grotesk';font-size:30px;color:var(--brass-dim);}
+  .dossier-body{padding:24px;}
+  .evrow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:22px;}
+  .evcell{border-top:1px solid var(--line-paper);padding-top:8px;}
+  .evcell .k{font-size:11.5px;color:var(--muted-lo);}
+  .evcell .v{font-family:'Space Grotesk';font-size:19px;margin-top:2px;}
+  .opp{border-top:1px solid var(--line-paper);padding:16px 0;}
+  .opp h4{font-size:16px;margin-bottom:4px;}
+  .opp p{font-size:14px;color:var(--muted-lo);margin:0 0 8px;}
+  .titleideas{display:flex;flex-wrap:wrap;gap:8px;}
+  .tichip{background:var(--paper-2);border:1px solid var(--line-paper);border-radius:3px;padding:6px 10px;font-size:13px;cursor:pointer;}
+  .tichip:hover{background:#fff;}
+  .gapbox{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:14px 16px;margin-top:16px;font-size:14px;}
+  .gapbox b{color:var(--brass-dim);}
+
+  /* license box */
+  .license-box{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:22px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;}
+  .license-box .field{margin:0;flex:1;min-width:220px;}
+
+  /* faq */
+  .faq{max-width:760px;}
+  .faqitem{border-top:1px solid var(--line);padding:18px 0;}
+  .faqitem h4{font-size:15.5px;margin-bottom:6px;}
+  .faqitem p{color:var(--muted-hi);font-size:14.5px;margin:0;}
+
+  footer{border-top:1px solid var(--line);padding:32px 0;font-size:13px;color:var(--muted-hi);}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+
+  /* modal */
+  .modal-veil{position:fixed;inset:0;background:rgba(6,11,18,0.7);display:none;align-items:center;justify-content:center;z-index:80;padding:20px;}
+  .modal-veil.open{display:flex;}
+  .modal{background:var(--paper);color:var(--text-lo);border-radius:6px;padding:28px;max-width:420px;width:100%;}
+  .modal h3{font-size:19px;}
+  .modal p{font-size:14px;color:var(--muted-lo);}
+
+  @media (max-width:860px){
+    .hero-grid{grid-template-columns:1fr;}
+    .hero h1{font-size:32px;}
+    .steps,.pricing-grid{grid-template-columns:1fr;}
+    .honesty{grid-template-columns:1fr;}
+    .evrow{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap">
+    <div class="brand"><span class="mark"></span> NicheForge AI</div>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#evidence">Why trust the data</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#license">Activate license</a>
+    </div>
+    <a class="navcta" href="#scan">Run a free scan</a>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">For video &amp; content creators</div>
+      <h1>Find the video niche nobody's fully covered yet.</h1>
+      <p class="lede">Enter a topic. NicheForge AI pulls real YouTube search data — views, upload frequency, channel size, breakout videos — then uses your own AI provider to turn that into ranked content angles and title ideas grounded in what's actually working right now.</p>
+      <div class="trust">
+        <span><span class="dot"></span> Real YouTube Data API v3 data, not estimates</span>
+        <span><span class="dot"></span> Your own OpenAI, Anthropic, or Gemini key</span>
+        <span><span class="dot"></span> 3 free scans, no credit card</span>
+      </div>
+    </div>
+
+    <div class="scan-panel" id="scan">
+      <h3>Run a niche scan</h3>
+      <div class="h3sub">Takes about 15 seconds.</div>
+
+      <div class="field">
+        <label for="f-query">Topic or niche</label>
+        <input type="text" id="f-query" placeholder="e.g. budget home espresso setups" />
+      </div>
+
+      <div class="field">
+        <label for="f-email">Your email</label>
+        <input type="email" id="f-email" placeholder="you@example.com" />
+        <div class="helper">Unlocks your 3 free scans. We'll also send you a note when we add new sources — no spam.</div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="f-provider">AI provider</label>
+          <select id="f-provider">
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-key">Your API key</label>
+          <input type="password" id="f-key" placeholder="sk-..." />
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="btn-test-key" type="button">Test connection</button>
+      <span id="test-key-status" class="status-line"></span>
+
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" id="btn-scan" type="button">Run niche scan</button>
+      </div>
+      <div id="scan-status" class="status-line"></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap" id="results-wrap" style="display:none;padding-top:8px;"></div>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">How it works</div>
+      <h2>Three steps, no spreadsheets</h2>
+      <p>NicheForge AI does the two things a content creator actually needs before filming: confirm real demand exists, and find the specific angle nobody's nailed yet.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h4>1. You name a topic</h4>
+        <p>Broad or specific — "sourdough for beginners" or "budget home espresso setups" both work.</p>
+      </div>
+      <div class="step">
+        <h4>2. We pull real YouTube data</h4>
+        <p>Views, upload cadence, channel size, and any breakout videos from the last 12 months — via YouTube's own API, not a scraped guess.</p>
+      </div>
+      <div class="step">
+        <h4>3. Your AI writes the strategy</h4>
+        <p>Your own OpenAI, Anthropic, or Gemini key turns the real data into ranked angles, a content gap, and title ideas — grounded in what's actually there.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="evidence">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Why trust the data</div>
+      <h2>Every number is labeled — real or estimated</h2>
+      <p>Most "niche finder" tools show you a score and ask you to trust it. NicheForge AI shows its work.</p>
+    </div>
+    <div class="honesty">
+      <div>
+        <h4>Comes straight from YouTube's API</h4>
+        <ul>
+          <li>Average and median views across the sample</li>
+          <li>Share of channels with 100k+ subscribers</li>
+          <li>Uploads per week and days since the last upload</li>
+          <li>Breakout videos that beat their own channel's average by 2x+</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Computed by a fixed, visible formula</h4>
+        <ul>
+          <li>Opportunity Score = a demand component, minus a saturation penalty, plus a freshness bonus</li>
+          <li>The exact formula is shown with every scan — nothing is a black box</li>
+          <li>AI is only allowed to reason from these real numbers, never invent new ones</li>
+          <li>If the AI's response doesn't match the required format, you see the raw output instead of a fabricated result</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Pricing</div>
+      <h2>One-time purchase, no subscription</h2>
+      <p>Pay once, keep the license. You still bring your own AI key, so there's no per-scan markup from us.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="plan" id="plan-STR">
+        <div class="tag">Starter</div>
+        <h3>For solo creators</h3>
+        <div class="price">$47</div>
+        <ul>
+          <li>Unlimited niche scans</li>
+          <li>Save your last 10 scans</li>
+          <li>CSV export of results</li>
+        </ul>
+        <div class="paypal-slot" id="paypal-STR"></div>
+      </div>
+      <div class="plan featured" id="plan-PRO">
+        <div class="tag">Pro</div>
+        <h3>For channels &amp; agencies</h3>
+        <div class="price">$97</div>
+        <ul>
+          <li>Everything in Starter</li>
+          <li>Batch mode — up to 5 topics per run</li>
+          <li>Competitor channel breakdown</li>
+        </ul>
+        <div class="paypal-slot" id="paypal-PRO"></div>
+      </div>
+      <div class="plan" id="plan-AGN">
+        <div class="tag">Agency</div>
+        <h3>For teams</h3>
+        <div class="price">$197</div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>White-label PDF report export</li>
+          <li>5 team license activations</li>
+        </ul>
+        <div class="paypal-slot" id="paypal-AGN"></div>
+      </div>
+    </div>
+    <div id="purchase-status" class="status-line" style="margin-top:14px;"></div>
+  </div>
+</section>
+
+<section id="license">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Already purchased?</div>
+      <h2>Activate your license</h2>
+      <p>Your key was emailed after checkout. Enter it here to unlock unlimited scans on this device.</p>
+    </div>
+    <div class="license-box">
+      <div class="field">
+        <label for="f-license">License key</label>
+        <input type="text" id="f-license" placeholder="NFORGE-STR-XXXXXXXX-XXXX" />
+      </div>
+      <button class="btn btn-primary" style="width:auto;" id="btn-activate">Activate</button>
+    </div>
+    <div id="license-status" class="status-line"></div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">FAQ</div>
+      <h2>Common questions</h2>
+    </div>
+    <div class="faq">
+      <div class="faqitem">
+        <h4>Why do I need my own AI key?</h4>
+        <p>It keeps NicheForge AI's price low and one-time instead of a monthly subscription — you only pay your AI provider for what you actually use, usually a fraction of a cent per scan.</p>
+      </div>
+      <div class="faqitem">
+        <h4>Is my API key stored anywhere?</h4>
+        <p>No. It's kept in your browser's local storage and sent only with each scan request to run that one scan — it's never written to our database.</p>
+      </div>
+      <div class="faqitem">
+        <h4>What exactly is "real" versus "estimated"?</h4>
+        <p>Views, subscriber counts, upload dates, and the Opportunity Score come directly from YouTube's API through a fixed formula shown on every result. The ranked angles, title ideas, and content gap are AI-written interpretations of that real data — useful judgment calls, not guaranteed outcomes.</p>
+      </div>
+      <div class="faqitem">
+        <h4>Does a high Opportunity Score guarantee views?</h4>
+        <p>No tool can promise that, and we won't claim otherwise. It's a research signal that shows where demand looks strong relative to competition right now — execution still matters.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>NicheForge AI v1.0</div>
+    <div class="muted-hi">Built for video &amp; content marketers. Your data stays yours.</div>
+  </div>
+</footer>
+
+<div class="modal-veil" id="email-modal">
+  <div class="modal">
+    <h3>One quick thing</h3>
+    <p>Enter your email to unlock your 3 free niche scans. No credit card, unsubscribe any time.</p>
+    <div class="field">
+      <label for="modal-email">Email address</label>
+      <input type="email" id="modal-email" placeholder="you@example.com" />
+    </div>
+    <button class="btn btn-primary" id="modal-continue">Unlock free scans</button>
+  </div>
+</div>
+
+<script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture" id="paypal-sdk-placeholder"></script>
+<script>
+
+// ===========================================================================
+// NicheForge AI — app.js (v1.0)
+// Vanilla JS, var-only, no arrow functions, no template-driven frameworks —
+// matches the single-file build convention used across this product line.
+// ===========================================================================
+
+var LS_PREFIX = 'nforge_';
+
+function lsGet(key) {
+  try { return localStorage.getItem(LS_PREFIX + key); } catch (e) { return null; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(LS_PREFIX + key, val); } catch (e) {}
+}
+
+function el(id) { return document.getElementById(id); }
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+// ---- email gate ------------------------------------------------------
+
+function ensureEmail(callback) {
+  var stored = lsGet('email');
+  if (stored) { callback(stored); return; }
+  var fieldEmail = el('f-email').value.trim();
+  if (fieldEmail) { callback(fieldEmail); return; }
+  el('email-modal').className = 'modal-veil open';
+  var handler = function () {
+    var val = el('modal-email').value.trim();
+    if (!val || val.indexOf('@') === -1) {
+      alert('Enter a valid email address.');
+      return;
+    }
+    lsSet('email', val);
+    el('f-email').value = val;
+    el('email-modal').className = 'modal-veil';
+    el('modal-continue').removeEventListener('click', handler);
+    callback(val);
+  };
+  el('modal-continue').addEventListener('click', handler);
+}
+
+// ---- test AI key -------------------------------------------------------
+
+el('btn-test-key').addEventListener('click', function () {
+  var provider = el('f-provider').value;
+  var apiKey = el('f-key').value.trim();
+  var statusEl = el('test-key-status');
+  if (!apiKey) {
+    statusEl.className = 'status-line status-bad';
+    statusEl.textContent = 'Paste your API key first.';
+    return;
+  }
+  statusEl.className = 'status-line';
+  statusEl.textContent = 'Testing…';
+  fetch('/api/test-ai-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: provider, apiKey: apiKey })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.valid) {
+        statusEl.className = 'status-line status-ok';
+        statusEl.textContent = 'Connected — key works.';
+        lsSet('ai_provider', provider);
+        lsSet('ai_key', apiKey);
+      } else {
+        statusEl.className = 'status-line status-bad';
+        statusEl.textContent = data.reason || (data.error && data.error.message) || 'Connection failed.';
+      }
+    })
+    .catch(function (e) {
+      statusEl.className = 'status-line status-bad';
+      statusEl.textContent = 'Network error: ' + e.message;
+    });
+});
+
+// restore saved AI provider/key
+(function restoreAiFields() {
+  var savedProvider = lsGet('ai_provider');
+  var savedKey = lsGet('ai_key');
+  if (savedProvider) el('f-provider').value = savedProvider;
+  if (savedKey) el('f-key').value = savedKey;
+  var savedEmail = lsGet('email');
+  if (savedEmail) el('f-email').value = savedEmail;
+})();
+
+// ---- run scan ------------------------------------------------------------
+
+el('btn-scan').addEventListener('click', function () {
+  var query = el('f-query').value.trim();
+  if (!query) {
+    el('scan-status').className = 'status-line status-bad';
+    el('scan-status').textContent = 'Enter a topic first.';
+    return;
+  }
+  ensureEmail(function (email) {
+    doScan(query, email);
+  });
+});
+
+function doScan(query, email) {
+  var provider = el('f-provider').value;
+  var apiKey = el('f-key').value.trim();
+  if (!apiKey) {
+    el('scan-status').className = 'status-line status-bad';
+    el('scan-status').textContent = 'Enter your AI provider API key first.';
+    return;
+  }
+
+  // fire-and-forget lead capture — never blocks the scan
+  fetch('/api/capture-lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, source: 'scan_form' })
+  }).catch(function () {});
+
+  var btn = el('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Scanning YouTube + running AI…';
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = '';
+
+  fetch('/api/niche-scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: query,
+      email: email,
+      aiProvider: provider,
+      aiApiKey: apiKey,
+      licenseKey: lsGet('license_key') || ''
+    })
+  })
+    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+    .then(function (result) {
+      btn.disabled = false;
+      btn.textContent = 'Run niche scan';
+      if (!result.data.success) {
+        el('scan-status').className = 'status-line status-bad';
+        var msg = result.data.error ? result.data.error.message : 'Something went wrong.';
+        var next = result.data.error && result.data.error.whatToDoNext ? ' ' + result.data.error.whatToDoNext : '';
+        el('scan-status').textContent = msg + next;
+        return;
+      }
+      el('scan-status').textContent = '';
+      renderResults(result.data);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Run niche scan';
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Network error: ' + e.message;
+    });
+}
+
+// ---- render results --------------------------------------------------
+
+function renderResults(data) {
+  var ev = data.evidence;
+  var ai = data.ai;
+  var html = '';
+
+  html += '<div class="dossier">';
+  html += '  <div class="dossier-head">';
+  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(data.query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; source: ' + escapeHtml(ev.dataSource) + '</div></div>';
+  html += '    <div style="text-align:right;"><div class="score">' + ev.opportunityScore + '</div><div class="muted-lo" style="font-size:12px;">Opportunity Score</div></div>';
+  html += '  </div>';
+  html += '  <div class="dossier-body">';
+  html += '    <div class="evrow">';
+  html += evCell('Avg views', ev.avgViews.toLocaleString());
+  html += evCell('Median views', ev.medianViews.toLocaleString());
+  html += evCell('100k+ sub channels', ev.bigChannelRatio === null ? 'unknown' : Math.round(ev.bigChannelRatio * 100) + '%');
+  html += evCell('Uploads / week', ev.uploadsPerWeekInSample);
+  html += '    </div>';
+
+  if (ev.breakoutVideos && ev.breakoutVideos.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Breakout videos found</b> (beat their channel\u2019s sampled average by 2x+):</div>';
+    html += '<ul style="margin:0 0 20px;padding-left:18px;font-size:13.5px;">';
+    for (var b = 0; b < ev.breakoutVideos.length; b++) {
+      html += '<li>' + escapeHtml(ev.breakoutVideos[b].title) + ' \u2014 ' + ev.breakoutVideos[b].views.toLocaleString() + ' views (channel avg in sample: ' + ev.breakoutVideos[b].channelAvgViews.toLocaleString() + ')</li>';
+    }
+    html += '</ul>';
+  }
+
+  html += '<div class="muted-lo" style="font-size:12px;margin-bottom:18px;">Score formula: ' + escapeHtml(ev.scoreFormula) + '</div>';
+
+  for (var i = 0; i < ai.opportunities.length; i++) {
+    var o = ai.opportunities[i];
+    html += '<div class="opp">';
+    html += '<h4>' + escapeHtml(o.angle) + '</h4>';
+    html += '<p>' + escapeHtml(o.rationale) + '</p>';
+    html += '<div class="titleideas">';
+    for (var t = 0; t < o.titleIdeas.length; t++) {
+      html += '<span class="tichip" data-copy="' + escapeHtml(o.titleIdeas[t]) + '">' + escapeHtml(o.titleIdeas[t]) + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  if (ai.contentGap) {
+    html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '</div>';
+  }
+
+  html += '  </div>';
+  html += '</div>';
+
+  if (data.meta && !data.meta.unlimited && data.meta.scansRemaining !== null) {
+    html += '<div class="muted-hi" style="font-size:13px;margin-top:14px;">' + data.meta.scansRemaining + ' free scan(s) remaining on this email. <a href="#pricing" style="color:#D9A441;">Upgrade for unlimited</a>.</div>';
+  }
+
+  var wrap = el('results-wrap');
+  wrap.innerHTML = html;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  var chips = wrap.querySelectorAll('.tichip');
+  for (var c = 0; c < chips.length; c++) {
+    chips[c].addEventListener('click', function () {
+      var text = this.getAttribute('data-copy');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        var original = this.textContent;
+        this.textContent = 'Copied!';
+        var self = this;
+        setTimeout(function () { self.textContent = original; }, 1200);
+      }
+    });
+  }
+}
+
+function evCell(label, value) {
+  return '<div class="evcell"><div class="k">' + escapeHtml(label) + '</div><div class="v">' + escapeHtml(String(value)) + '</div></div>';
+}
+
+// ---- license activation --------------------------------------------------
+
+el('btn-activate').addEventListener('click', function () {
+  var key = el('f-license').value.trim();
+  var statusEl = el('license-status');
+  if (!key) {
+    statusEl.className = 'status-line status-bad';
+    statusEl.textContent = 'Enter a license key first.';
+    return;
+  }
+  statusEl.className = 'status-line';
+  statusEl.textContent = 'Checking…';
+  fetch('/api/verify-license', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ licenseKey: key })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.valid) {
+        lsSet('license_key', key);
+        lsSet('license_tier', data.tier);
+        statusEl.className = 'status-line status-ok';
+        statusEl.textContent = 'Activated — ' + data.tierLabel + ' unlocked on this device.';
+      } else {
+        statusEl.className = 'status-line status-bad';
+        statusEl.textContent = data.reason || 'That key is not valid.';
+      }
+    })
+    .catch(function (e) {
+      statusEl.className = 'status-line status-bad';
+      statusEl.textContent = 'Network error: ' + e.message;
+    });
+});
+
+(function restoreLicense() {
+  var key = lsGet('license_key');
+  if (key) el('f-license').value = key;
+})();
+
+// ---- PayPal buttons --------------------------------------------------
+
+var TIER_PRICES = { STR: '47.00', PRO: '97.00', AGN: '197.00' };
+
+function loadPaypalSdk(clientId, callback) {
+  var existing = el('paypal-sdk-placeholder');
+  if (existing) existing.parentNode.removeChild(existing);
+  var script = document.createElement('script');
+  script.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(clientId) + '&currency=USD&intent=capture';
+  script.onload = callback;
+  document.body.appendChild(script);
+}
+
+function renderPaypalButtons() {
+  var tiers = ['STR', 'PRO', 'AGN'];
+  for (var i = 0; i < tiers.length; i++) {
+    (function (tier) {
+      window.paypal.Buttons({
+        style: { layout: 'horizontal', height: 40, color: 'black', label: 'pay' },
+        createOrder: function (data, actions) {
+          return actions.order.create({
+            purchase_units: [{ amount: { value: TIER_PRICES[tier] }, description: 'NicheForge AI \u2014 ' + tier }]
+          });
+        },
+        onApprove: function (data) {
+          var email = lsGet('email') || el('f-email').value.trim();
+          if (!email || email.indexOf('@') === -1) {
+            email = prompt('Enter the email address for your license key:') || '';
+          }
+          el('purchase-status').className = 'status-line';
+          el('purchase-status').textContent = 'Verifying payment…';
+          return fetch('/api/verify-paypal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderID: data.orderID, tier: tier, email: email })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+              if (result.success) {
+                lsSet('license_key', result.licenseKey);
+                lsSet('license_tier', result.tier);
+                el('f-license').value = result.licenseKey;
+                el('purchase-status').className = 'status-line status-ok';
+                el('purchase-status').textContent = 'Purchase complete! Your ' + result.tierLabel + ' license key is ' + result.licenseKey + (result.emailSent ? ' (also emailed to you).' : '.');
+              } else {
+                el('purchase-status').className = 'status-line status-bad';
+                el('purchase-status').textContent = (result.error ? result.error.message : 'Payment verification failed.');
+              }
+            });
+        },
+        onError: function (err) {
+          el('purchase-status').className = 'status-line status-bad';
+          el('purchase-status').textContent = 'PayPal error: ' + err;
+        }
+      }).render('#paypal-' + tier);
+    })(tiers[i]);
+  }
+}
+
+fetch('/api/config')
+  .then(function (r) { return r.json(); })
+  .then(function (cfg) {
+    if (cfg.paypalClientId) {
+      loadPaypalSdk(cfg.paypalClientId, renderPaypalButtons);
+    } else {
+      var note = document.createElement('div');
+      note.className = 'muted-hi';
+      note.style.fontSize = '13px';
+      note.textContent = 'Checkout is not configured yet — the site owner needs to set PAYPAL_CLIENT_ID.';
+      el('pricing').querySelector('.wrap').appendChild(note);
+    }
+  })
+  .catch(function () {});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "nicheforge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NicheForge AI - real YouTube data + BYOK AI niche/content opportunity research tool for video and content marketers.",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

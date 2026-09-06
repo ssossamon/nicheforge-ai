@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NicheForge AI — Admin</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  :root{
+    --ink:#0E1B2A; --ink-2:#142638; --line:#2A415C; --brass:#D9A441;
+    --text-hi:#EAF0F6; --muted-hi:#9FB2C6;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--ink);color:var(--text-hi);padding:32px;}
+  .wrap{max-width:880px;margin:0 auto;}
+  h1{font-size:22px;margin-bottom:4px;}
+  .muted{color:var(--muted-hi);font-size:13.5px;}
+  .card{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:22px;margin-top:20px;}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted-hi);margin-bottom:5px;}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:#0B1620;color:var(--text-hi);font-size:14px;margin-bottom:12px;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  button{background:var(--brass);color:var(--ink);border:none;padding:10px 16px;border-radius:3px;font-weight:600;cursor:pointer;font-size:14px;}
+  button.secondary{background:transparent;border:1px solid var(--line);color:var(--text-hi);}
+  .status{font-size:13px;margin-top:10px;min-height:16px;}
+  .status.ok{color:#5FA97A;}
+  .status.bad{color:#C1613F;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted-hi);font-weight:600;}
+  #gate{max-width:360px;margin:80px auto;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>NicheForge AI — Admin</h1>
+  <p class="muted">Enter your admin/owner key to continue.</p>
+  <label for="admin-key-input">Admin key</label>
+  <input type="password" id="admin-key-input" placeholder="NFORGE-ADM-SCOTT-2026" />
+  <button id="gate-btn">Enter</button>
+  <div class="status" id="gate-status"></div>
+</div>
+
+<div class="wrap" id="panel" style="display:none;">
+  <h1>NicheForge AI — Admin</h1>
+  <p class="muted">Generate license keys and export leads/licenses. This page is not linked from the site and is not indexed.</p>
+
+  <div class="card">
+    <h3>Generate license keys</h3>
+    <div class="row">
+      <div>
+        <label for="gen-tier">Tier</label>
+        <select id="gen-tier">
+          <option value="STR">Starter ($47)</option>
+          <option value="PRO">Pro ($97)</option>
+          <option value="AGN">Agency ($197)</option>
+        </select>
+      </div>
+      <div>
+        <label for="gen-qty">Quantity</label>
+        <input type="text" id="gen-qty" value="1" />
+      </div>
+    </div>
+    <label for="gen-email">Pre-assign to email (optional)</label>
+    <input type="text" id="gen-email" placeholder="leave blank for unassigned bulk keys" />
+    <button id="gen-btn">Generate</button>
+    <button class="secondary" id="gen-csv-btn" type="button">Generate &amp; download CSV</button>
+    <div class="status" id="gen-status"></div>
+    <table id="gen-table" style="display:none;">
+      <thead><tr><th>Key</th><th>Tier</th><th>Status</th><th>Email</th></tr></thead>
+      <tbody id="gen-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Export data</h3>
+    <button id="export-leads-btn">Download leads CSV</button>
+    <button class="secondary" id="export-licenses-btn" style="margin-left:10px;">Download licenses CSV</button>
+    <div class="status" id="export-status"></div>
+  </div>
+</div>
+
+<script>
+
+function el(id) { return document.getElementById(id); }
+var ADMIN_KEY_LS = 'nforge_admin_key';
+
+function getAdminKey() {
+  try { return localStorage.getItem(ADMIN_KEY_LS) || ''; } catch (e) { return ''; }
+}
+function setAdminKey(val) {
+  try { localStorage.setItem(ADMIN_KEY_LS, val); } catch (e) {}
+}
+
+function callAdmin(body, acceptCsv, callback) {
+  var headers = { 'Content-Type': 'application/json', 'x-admin-key': getAdminKey() };
+  if (acceptCsv) headers['Accept'] = 'text/csv';
+  fetch('/api/admin-keys', { method: 'POST', headers: headers, body: JSON.stringify(body) })
+    .then(function (r) {
+      if (acceptCsv) {
+        if (!r.ok) { r.json().then(function (d) { callback(null, d); }); return; }
+        r.blob().then(function (blob) { callback(blob, null); });
+      } else {
+        r.json().then(function (d) { callback(r.ok ? d : null, r.ok ? null : d); });
+      }
+    })
+    .catch(function (e) { callback(null, { error: { message: e.message } }); });
+}
+
+function downloadBlob(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+el('gate-btn').addEventListener('click', function () {
+  var key = el('admin-key-input').value.trim();
+  if (!key) return;
+  setAdminKey(key);
+  callAdmin({ action: 'export_leads' }, true, function (blob, err) {
+    if (err) {
+      el('gate-status').className = 'status bad';
+      el('gate-status').textContent = err.error ? err.error.message : 'Could not verify admin key.';
+      return;
+    }
+    el('gate').style.display = 'none';
+    el('panel').style.display = 'block';
+  });
+});
+
+(function tryStoredKey() {
+  if (getAdminKey()) {
+    callAdmin({ action: 'export_leads' }, true, function (blob, err) {
+      if (!err) {
+        el('gate').style.display = 'none';
+        el('panel').style.display = 'block';
+      }
+    });
+  }
+})();
+
+el('gen-btn').addEventListener('click', function () {
+  runGenerate(false);
+});
+el('gen-csv-btn').addEventListener('click', function () {
+  runGenerate(true);
+});
+
+function runGenerate(asCsv) {
+  var tier = el('gen-tier').value;
+  var qty = parseInt(el('gen-qty').value, 10) || 1;
+  var email = el('gen-email').value.trim();
+  el('gen-status').className = 'status';
+  el('gen-status').textContent = 'Generating…';
+  callAdmin({ action: 'generate', tier: tier, quantity: qty, email: email }, asCsv, function (result, err) {
+    if (err) {
+      el('gen-status').className = 'status bad';
+      el('gen-status').textContent = err.error ? err.error.message : 'Failed to generate keys.';
+      return;
+    }
+    if (asCsv) {
+      downloadBlob(result, 'nicheforge-keys-' + tier + '.csv');
+      el('gen-status').className = 'status ok';
+      el('gen-status').textContent = 'CSV downloaded.';
+      return;
+    }
+    el('gen-status').className = 'status ok';
+    el('gen-status').textContent = 'Generated ' + result.generated.length + ' key(s).';
+    var tbody = el('gen-tbody');
+    tbody.innerHTML = '';
+    for (var i = 0; i < result.generated.length; i++) {
+      var rec = result.generated[i];
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + rec.key + '</td><td>' + rec.tier + '</td><td>' + rec.status + '</td><td>' + (rec.email || '\u2014') + '</td>';
+      tbody.appendChild(tr);
+    }
+    el('gen-table').style.display = 'table';
+  });
+}
+
+el('export-leads-btn').addEventListener('click', function () {
+  el('export-status').className = 'status';
+  el('export-status').textContent = 'Preparing export…';
+  callAdmin({ action: 'export_leads' }, true, function (blob, err) {
+    if (err) {
+      el('export-status').className = 'status bad';
+      el('export-status').textContent = err.error ? err.error.message : 'Export failed.';
+      return;
+    }
+    downloadBlob(blob, 'nicheforge-leads.csv');
+    el('export-status').className = 'status ok';
+    el('export-status').textContent = 'Downloaded.';
+  });
+});
+
+el('export-licenses-btn').addEventListener('click', function () {
+  el('export-status').className = 'status';
+  el('export-status').textContent = 'Preparing export…';
+  callAdmin({ action: 'export_licenses' }, true, function (blob, err) {
+    if (err) {
+      el('export-status').className = 'status bad';
+      el('export-status').textContent = err.error ? err.error.message : 'Export failed.';
+      return;
+    }
+    downloadBlob(blob, 'nicheforge-licenses.csv');
+    el('export-status').className = 'status ok';
+    el('export-status').textContent = 'Downloaded.';
+  });
+});
+
+</script>
+</body>
+</html>
