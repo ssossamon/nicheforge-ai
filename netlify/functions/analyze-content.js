@@ -285,7 +285,9 @@ async function callAi(provider, apiKey, model, systemPrompt, userPrompt, require
       throw err;
     }
   }
-  if (!Array.isArray(parsed.monetizationAngles)) parsed.monetizationAngles = parsed.monetizationAngles || [];
+  if (parsed.monetizationAngles !== undefined && !Array.isArray(parsed.monetizationAngles)) {
+    parsed.monetizationAngles = [];
+  }
   return parsed;
 }
 
