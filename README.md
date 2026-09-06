@@ -113,6 +113,64 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v2.1 — Transparent, deterministic scoring engine (Demand/Competition/Momentum/Gap/Monetization/Evidence Confidence)
+
+The old Opportunity Score was one blended formula (`log(views) - saturation
++ freshness`). This breaks it into 6 named, individually-inspectable
+components with real weights, shown in a new expandable "Score breakdown"
+drawer under every niche scan result:
+
+- **Demand, Competition Opportunity, Momentum, Evidence Confidence** \u2014
+  computed purely from real evidence already gathered (views, upload
+  cadence, channel-size distribution, breakout videos, sample completeness).
+  Every formula is plain-text, visible in the drawer, with the exact real
+  inputs used.
+- **Content Gap, Monetization Potential** \u2014 these need real judgment (what's
+  genuinely uncovered, whether there's buyer intent) that a formula can't
+  honestly produce from view counts alone, so they come from the AI
+  synthesis call and are always labeled "AI Inference" in the drawer, with
+  a one-sentence justification \u2014 never presented as computed.
+- **Execution Fit** \u2014 intentionally left unscored. It would need a user's
+  own skills/time/resources profile, which NicheForge doesn't collect. Its
+  10% weight is redistributed proportionally across the other six
+  components rather than guessed \u2014 the drawer shows this reweighting
+  explicitly, and unit tests confirm the reweighted percentages always sum
+  to exactly 100% regardless of which components are available.
+
+**A real architectural constraint drove a two-stage design.**
+`watchlist-recheck.js` runs as a scheduled background job with no AI key
+available (BYOK \u2014 there's no per-request key to use), so it can't get
+AI-judged Gap/Monetization scores. So there's an **evidence-only** score
+(computed the moment evidence is gathered, before any AI call \u2014 this is
+what the watchlist background check sees and compares over time) and a
+**full** score (interactive scans only, adding the AI's judgment after it
+returns). Both are real, meaningful, comparable-over-time numbers; they're
+just built from different amounts of available information, which is
+exactly what "Evidence Confidence" is meant to capture.
+
+**A caching bug found and fixed during testing**: moving the score-history
+append out of the evidence-gathering step (needed since the full score now
+depends on the AI response, which comes later) meant a cache hit would
+return a *stale* embedded history list \u2014 frozen at the moment it was
+cached, missing any point appended by a later fresh scan of the same
+query. Fixed by always reading live history on a cache hit instead of
+trusting the cached copy. Caught by a full mocked integration test
+(fake YouTube + AI responses) that exercises fresh-scan, cache-hit, and
+forced-refresh paths end-to-end \u2014 not just the scoring math in isolation.
+
+**Also fixed in passing**: the History modal was reading `h.opportunityScore`,
+a field the API has never actually returned (it returns `score`) \u2014 every
+entry showed "Score undefined." Unrelated to this work, but trivial and
+directly adjacent, so fixed while here.
+
+**Verified**: full mocked integration test covering fresh scan, cache hit,
+forced refresh, and the no-AI watchlist path; unit tests on the weighting
+math (reweighted shares always sum to 1.0, strong/weak evidence
+discriminate sensibly); confirmed zero changes needed in `reports.js`,
+`saveToHistory`, or `watchlist-recheck.js` (all consume the score generically
+and remain fully compatible); full backend + frontend syntax/style/id
+validation.
+
 ## v2.0 — Transcript Intelligence extended to Analyze URL (video + pasted script)
 
 v1.9 only reached the dedicated Transcript Playbook tool. Analyze URL's

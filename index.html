@@ -151,6 +151,29 @@
   .gapbox{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:14px 16px;margin-top:16px;font-size:14px;}
   .gapbox b{color:var(--brass-dim);}
 
+  /* ---- Transparent score breakdown drawer ---- */
+  .score-drawer{border:1px solid var(--line-paper);border-radius:5px;margin-bottom:20px;overflow:hidden;}
+  .score-drawer-toggle{width:100%;text-align:left;background:var(--paper-2);border:none;padding:12px 16px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-family:inherit;}
+  .score-drawer-toggle:hover{background:#EFE9D8;}
+  .score-drawer-arrow{transition:transform 0.15s;font-size:10px;color:var(--muted-lo);}
+  .score-drawer-arrow.open{transform:rotate(180deg);}
+  .score-drawer-body{padding:16px;display:none;}
+  .score-drawer-body.open{display:block;}
+  .score-component-row{display:flex;align-items:center;gap:10px;padding-top:10px;}
+  .score-component-row.first{padding-top:0;}
+  .score-component-label{width:170px;flex:none;font-size:13px;}
+  .score-component-bar-track{flex:1;height:8px;background:var(--paper-2);border-radius:4px;overflow:hidden;}
+  .score-component-bar-fill{height:100%;border-radius:4px;}
+  .score-component-value{font-family:'Space Grotesk';font-weight:700;font-size:15px;width:34px;text-align:right;flex:none;}
+  .score-component-weight{width:44px;flex:none;text-align:right;font-size:11px;color:var(--muted-lo);}
+  .score-provenance-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:2px 6px;border-radius:3px;display:inline-block;margin-top:3px;}
+  .score-provenance-computed{background:#E9F3EC;color:#2E7D4F;}
+  .score-provenance-ai{background:#FBF3E4;color:var(--brass-dim);}
+  .score-provenance-unavailable{background:var(--paper-2);color:var(--muted-lo);}
+  .score-component-formula{font-size:11px;color:var(--muted-lo);margin:5px 0 0;padding-bottom:10px;border-bottom:1px solid var(--line-paper);}
+  .score-component-row:last-of-type + .score-component-formula{border-bottom:none;}
+  .score-component-justification{font-size:11.5px;color:var(--brass-dim);margin:5px 0 0;font-style:italic;}
+
   /* ---- Playbook document (Gamma-style structured document) ---- */
   .pb-doc{background:var(--paper);border-radius:6px;overflow:hidden;}
   .pb-hero{background:linear-gradient(135deg,var(--ink) 0%,var(--ink-2) 100%);color:var(--text-hi);padding:30px 30px 24px;}
@@ -1686,6 +1709,36 @@ function showResults(html) {
   renderScoreCharts();
 }
 
+// Renders the transparent, per-component score breakdown: each of the 8
+// named dimensions with its value, reweighted share of the final number,
+// provenance (real formula vs AI judgment vs not scored), and the exact
+// formula/inputs used — collapsed by default, expandable on click.
+function buildScoreDrawerHtml(sb, idx) {
+  if (!sb || !sb.overall) return '';
+  var html = '<div class="score-drawer">';
+  html += '<button type="button" class="score-drawer-toggle" data-drawer-idx="' + idx + '">';
+  html += '<span>Score breakdown \u2014 ' + sb.overall.value + '/100 (' + escapeHtml(sb.overall.band) + ')</span>';
+  html += '<span class="score-drawer-arrow" id="score-drawer-arrow-' + idx + '">\u25BC</span>';
+  html += '</button>';
+  html += '<div class="score-drawer-body" id="score-drawer-body-' + idx + '">';
+  for (var i = 0; i < sb.components.length; i++) {
+    var c = sb.components[i];
+    var barColor = c.value === null ? 'var(--line-paper)' : (c.provenance === 'AI Inference' ? 'var(--brass)' : 'var(--moss)');
+    var tagClass = c.provenance === 'Computed' ? 'score-provenance-computed' : c.provenance === 'AI Inference' ? 'score-provenance-ai' : 'score-provenance-unavailable';
+    html += '<div class="score-component-row' + (i === 0 ? ' first' : '') + '">';
+    html += '<div class="score-component-label">' + escapeHtml(c.label) + '<div><span class="score-provenance-tag ' + tagClass + '">' + escapeHtml(c.provenance) + '</span></div></div>';
+    html += '<div class="score-component-bar-track"><div class="score-component-bar-fill" style="width:' + (c.value === null ? 0 : c.value) + '%;background:' + barColor + ';"></div></div>';
+    html += '<div class="score-component-value">' + (c.value === null ? '\u2014' : c.value) + '</div>';
+    html += '<div class="score-component-weight">' + Math.round(c.weight * 100) + '%</div>';
+    html += '</div>';
+    html += '<div class="score-component-formula">' + escapeHtml(c.formula) + '</div>';
+    if (c.justification) html += '<div class="score-component-justification">\u201C' + escapeHtml(c.justification) + '\u201D</div>';
+  }
+  html += '<div class="muted-lo" style="font-size:11.5px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-paper);">' + escapeHtml(sb.weightsNote) + '</div>';
+  html += '</div></div>';
+  return html;
+}
+
 function buildDossierHtml(query, ev, ai, idx) {
   var html = '';
   html += '<div class="dossier">';
@@ -1735,7 +1788,7 @@ function buildDossierHtml(query, ev, ai, idx) {
     html += '</ul>';
   }
 
-  html += '<div class="muted-lo" style="font-size:12px;margin-bottom:18px;">Score formula: ' + escapeHtml(ev.scoreFormula) + '</div>';
+  html += buildScoreDrawerHtml(ev.scoreBreakdown, idx);
 
   for (var i = 0; i < ai.opportunities.length; i++) {
     var o = ai.opportunities[i];
@@ -1826,6 +1879,16 @@ function renderScoreCharts() {
 
 el('results-wrap').addEventListener('click', function (e) {
   var target = e.target;
+
+  var drawerToggle = target.closest ? target.closest('.score-drawer-toggle') : null;
+  if (drawerToggle) {
+    var dIdx = drawerToggle.getAttribute('data-drawer-idx');
+    var body = document.getElementById('score-drawer-body-' + dIdx);
+    var arrow = document.getElementById('score-drawer-arrow-' + dIdx);
+    if (body) body.classList.toggle('open');
+    if (arrow) arrow.classList.toggle('open');
+    return;
+  }
 
   if (target.classList.contains('channel-link')) {
     openChannelBreakdown(target.getAttribute('data-channel-id'), target.getAttribute('data-channel-title'));
@@ -2108,7 +2171,7 @@ function loadHistory() {
       for (var i = 0; i < data.history.length; i++) {
         var h = data.history[i];
         html += '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-paper);padding:10px 0;">';
-        html += '<div><b style="font-size:14px;">' + escapeHtml(h.query) + '</b><div class="muted-lo" style="font-size:12px;">Score ' + h.opportunityScore + ' \u00B7 ' + new Date(h.timestamp).toLocaleString() + '</div></div>';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(h.query) + '</b><div class="muted-lo" style="font-size:12px;">Score ' + (h.score === null || h.score === undefined ? 'n/a' : h.score) + ' \u00B7 ' + new Date(h.timestamp).toLocaleString() + '</div></div>';
         html += '<div style="display:flex;gap:6px;"><button class="btn btn-ghost history-open-btn" data-id="' + escapeHtml(h.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Open</button>';
         html += '<button class="btn btn-ghost history-delete-btn" data-id="' + escapeHtml(h.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Delete</button></div>';
         html += '</div>';

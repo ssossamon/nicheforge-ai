@@ -74,6 +74,178 @@ async function appendScoreHistory(query, opportunityScore, avgViews) {
 }
 
 // ===========================================================================
+// Transparent multi-component scoring engine.
+//
+// Four components are computed purely from real evidence (no AI involved):
+// Demand, Competition Opportunity, Momentum, Evidence Confidence. Two more
+// — Gap and Monetization — need real judgment (what's actually missing from
+// existing coverage, whether there's genuine buyer intent) that a formula
+// can't honestly produce from view counts alone, so those come from the AI
+// synthesis call and are always labeled "AI Inference," never presented as
+// computed. A seventh, Execution Fit, needs a user's own skills/time/
+// resources — NicheForge doesn't collect that yet, so it's left unscored
+// and its weight is redistributed across whichever components ARE
+// available, exactly the reweighting rule this whole design follows.
+// ===========================================================================
+
+const SCORE_WEIGHTS = {
+  demand: 0.20,
+  competitionOpportunity: 0.15,
+  momentum: 0.15,
+  gap: 0.20,
+  monetization: 0.15,
+  executionFit: 0.10,
+  evidenceConfidence: 0.05
+};
+
+function clampScore(v) {
+  return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function computeDemandScore(evidence) {
+  const blended = (evidence.avgViews + evidence.medianViews) / 2;
+  return clampScore(Math.log10(blended + 1) * 16.67);
+}
+
+function computeCompetitionOpportunityScore(evidence) {
+  // Unknown channel-size data gets a neutral midpoint rather than assuming
+  // either a wide-open or fully saturated market.
+  const dominance = evidence.bigChannelRatio === null ? 0.5 : evidence.bigChannelRatio;
+  const dominancePoints = (1 - dominance) * 80;
+  const breakoutBonus = Math.min(20, evidence.breakoutVideoCount * 4);
+  return clampScore(dominancePoints + breakoutBonus);
+}
+
+function computeMomentumScore(evidence) {
+  const freshness = evidence.daysSinceMostRecentUpload <= 7 ? 40
+    : evidence.daysSinceMostRecentUpload <= 14 ? 30
+    : evidence.daysSinceMostRecentUpload <= 30 ? 15
+    : 0;
+  const cadence = Math.max(0, Math.min(30, Math.round(evidence.uploadsPerWeekInSample * 6)));
+  const breakout = Math.max(0, Math.min(30, evidence.breakoutVideoCount * 6));
+  return clampScore(freshness + cadence + breakout);
+}
+
+function computeEvidenceConfidenceScore(evidence) {
+  const sampleSize = Math.max(0, Math.min(40, Math.round((evidence.videoCount / 25) * 40)));
+  const completeness = Math.max(0, Math.min(30, Math.round((evidence.channelsWithKnownSubs / Math.max(1, evidence.uniqueChannelCount)) * 30)));
+  const recency = evidence.daysSinceMostRecentUpload <= 14 ? 30
+    : evidence.daysSinceMostRecentUpload <= 30 ? 20
+    : evidence.daysSinceMostRecentUpload <= 90 ? 10
+    : 0;
+  return clampScore(sampleSize + completeness + recency);
+}
+
+function scoreBandLabel(score) {
+  if (score >= 80) return 'Strong';
+  if (score >= 65) return 'Promising';
+  if (score >= 50) return 'Validate First';
+  if (score >= 35) return 'Weak';
+  return 'Avoid for Now';
+}
+
+// Combines whichever named components have a real numeric value, giving
+// each its full weight from SCORE_WEIGHTS reweighted proportionally across
+// only the available components — an unavailable component's weight is
+// redistributed, never silently defaulted to a value.
+function combineWeighted(componentValues) {
+  let availableWeightSum = 0;
+  const usedKeys = [];
+  Object.keys(SCORE_WEIGHTS).forEach(function (key) {
+    if (typeof componentValues[key] === 'number') {
+      availableWeightSum += SCORE_WEIGHTS[key];
+      usedKeys.push(key);
+    }
+  });
+  if (availableWeightSum === 0) return { overall: null, reweighted: {}, usedKeys: [] };
+  const reweighted = {};
+  let weightedSum = 0;
+  usedKeys.forEach(function (key) {
+    reweighted[key] = SCORE_WEIGHTS[key] / availableWeightSum;
+    weightedSum += componentValues[key] * reweighted[key];
+  });
+  return { overall: Math.round(weightedSum), reweighted: reweighted, usedKeys: usedKeys };
+}
+
+// Assembles the full transparent breakdown object the frontend's score
+// drawer renders — every component's value (or null), its formula in
+// plain text, its provenance (Computed vs AI Inference vs Not scored), its
+// reweighted share of the final number, and the resulting Overall score
+// and band. `stage` records whether this reflects evidence-only scoring
+// (no AI ever ran — the watchlist background recheck path) or the fuller
+// AI-enriched version an interactive scan produces.
+function buildScoreBreakdown(evidence, aiScores, stage) {
+  const demand = computeDemandScore(evidence);
+  const competitionOpportunity = computeCompetitionOpportunityScore(evidence);
+  const momentum = computeMomentumScore(evidence);
+  const evidenceConfidence = computeEvidenceConfidenceScore(evidence);
+  const gap = aiScores && typeof aiScores.gapScore === 'number' ? clampScore(aiScores.gapScore) : null;
+  const monetization = aiScores && typeof aiScores.monetizationScore === 'number' ? clampScore(aiScores.monetizationScore) : null;
+
+  const combo = combineWeighted({
+    demand: demand,
+    competitionOpportunity: competitionOpportunity,
+    momentum: momentum,
+    gap: gap,
+    monetization: monetization,
+    evidenceConfidence: evidenceConfidence
+    // executionFit intentionally omitted: no execution-profile input exists yet.
+  });
+
+  const components = [
+    {
+      key: 'demand', label: 'Demand', value: demand, provenance: 'Computed',
+      weight: combo.reweighted.demand || 0, rawWeight: SCORE_WEIGHTS.demand,
+      formula: 'log10((avgViews + medianViews) / 2 + 1) \u00D7 16.67, clamped 0-100',
+      inputs: { avgViews: evidence.avgViews, medianViews: evidence.medianViews }
+    },
+    {
+      key: 'competitionOpportunity', label: 'Competition Opportunity', value: competitionOpportunity, provenance: 'Computed',
+      weight: combo.reweighted.competitionOpportunity || 0, rawWeight: SCORE_WEIGHTS.competitionOpportunity,
+      formula: '(1 \u2212 shareOf100k+SubChannels) \u00D7 80 + min(20, breakoutVideos \u00D7 4). Higher = less dominated by big channels.',
+      inputs: { bigChannelRatio: evidence.bigChannelRatio, breakoutVideoCount: evidence.breakoutVideoCount }
+    },
+    {
+      key: 'momentum', label: 'Momentum', value: momentum, provenance: 'Computed',
+      weight: combo.reweighted.momentum || 0, rawWeight: SCORE_WEIGHTS.momentum,
+      formula: 'freshness(0/15/30/40 by days since last upload) + cadence(uploads/week \u00D7 6, capped 30) + breakout(count \u00D7 6, capped 30)',
+      inputs: { daysSinceMostRecentUpload: evidence.daysSinceMostRecentUpload, uploadsPerWeekInSample: evidence.uploadsPerWeekInSample, breakoutVideoCount: evidence.breakoutVideoCount }
+    },
+    {
+      key: 'gap', label: 'Content Gap', value: gap, provenance: gap === null ? 'Not available' : 'AI Inference',
+      weight: combo.reweighted.gap || 0, rawWeight: SCORE_WEIGHTS.gap,
+      formula: gap === null ? 'Requires the AI synthesis step, which hasn\u2019t run for this evidence yet.' : 'AI-estimated 0-100: how underserved the real evidence (titles, comments, autocomplete) shows this angle to be.',
+      justification: (aiScores && aiScores.gapScoreJustification) || null
+    },
+    {
+      key: 'monetization', label: 'Monetization Potential', value: monetization, provenance: monetization === null ? 'Not available' : 'AI Inference',
+      weight: combo.reweighted.monetization || 0, rawWeight: SCORE_WEIGHTS.monetization,
+      formula: monetization === null ? 'Requires the AI synthesis step, which hasn\u2019t run for this evidence yet.' : 'AI-estimated 0-100: buyer intent and plausible offer fit implied by the real evidence \u2014 never a revenue prediction.',
+      justification: (aiScores && aiScores.monetizationScoreJustification) || null
+    },
+    {
+      key: 'executionFit', label: 'Execution Fit', value: null, provenance: 'Not scored',
+      weight: 0, rawWeight: SCORE_WEIGHTS.executionFit,
+      formula: 'Needs your own skills/time/resources profile, which NicheForge doesn\u2019t collect yet \u2014 its 10% weight is redistributed across the other components below rather than guessed.'
+    },
+    {
+      key: 'evidenceConfidence', label: 'Evidence Confidence', value: evidenceConfidence, provenance: 'Computed',
+      weight: combo.reweighted.evidenceConfidence || 0, rawWeight: SCORE_WEIGHTS.evidenceConfidence,
+      formula: 'sampleSize(videoCount/25 \u00D7 40) + completeness(channelsWithKnownSubs/uniqueChannelCount \u00D7 30) + recency(0/10/20/30 by days since last upload)',
+      inputs: { videoCount: evidence.videoCount, channelsWithKnownSubs: evidence.channelsWithKnownSubs, uniqueChannelCount: evidence.uniqueChannelCount }
+    }
+  ];
+
+  return {
+    stage: stage, // 'evidence-only' (no AI ran) or 'full' (AI synthesis included)
+    overall: combo.overall === null ? null : { value: combo.overall, band: scoreBandLabel(combo.overall) },
+    components: components,
+    weightsNote: 'Execution Fit is unscored (no execution profile provided), so its 10% weight was redistributed proportionally across the other six components below.',
+    computedAt: new Date().toISOString()
+  };
+}
+
+// ===========================================================================
 // Real viewer comments — pulled from the top few highest-viewed videos in
 // the sample so the AI's "content gap" can be grounded in what viewers
 // actually said, not just inferred from titles and view counts. Videos with
@@ -238,11 +410,26 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
 
   const shortsCount = videos.filter(function (v) { return v.isShort; }).length;
 
-  // ---- Transparent, deterministic Opportunity Score (0-100) --------------
-  const demandPoints = Math.min(60, Math.log10(avgViews + 1) * 10);
-  const saturationPenalty = bigChannelRatio === null ? 0 : bigChannelRatio * 30;
-  const freshnessBonus = daysSinceMostRecent <= 14 ? 10 : daysSinceMostRecent <= 30 ? 5 : 0;
-  const opportunityScore = Math.max(0, Math.min(100, Math.round(demandPoints - saturationPenalty + freshnessBonus)));
+  // ---- Transparent, deterministic scoring (evidence-only stage) ----------
+  // This is the score watchlist-recheck.js sees directly — it calls
+  // gatherYoutubeEvidence with no AI key available (a scheduled job, BYOK
+  // constraint), so it must get a real, meaningful, standalone score from
+  // evidence alone. A full interactive scan enriches this further in
+  // runFullScan once the AI's Gap/Monetization judgment exists.
+  const evidenceOnlyDraft = {
+    avgViews: avgViews,
+    medianViews: medianViews,
+    bigChannelRatio: bigChannelRatio,
+    breakoutVideos: breakoutVideos,
+    breakoutVideoCount: breakoutVideos.length,
+    daysSinceMostRecentUpload: daysSinceMostRecent,
+    uploadsPerWeekInSample: uploadsPerWeek,
+    videoCount: videos.length,
+    channelsWithKnownSubs: knownSubChannels.length,
+    uniqueChannelCount: channelIds.length
+  };
+  const scoreBreakdown = buildScoreBreakdown(evidenceOnlyDraft, null, 'evidence-only');
+  const opportunityScore = scoreBreakdown.overall.value;
 
   // Real, independent signals alongside the ranked-results data above.
   const topVideoIdsForComments = videos
@@ -252,7 +439,7 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
     .map(function (v) { return v.id; });
   const topComments = await gatherTopComments(topVideoIdsForComments, ytKey);
   const autocompleteSuggestions = await gatherAutocompleteSuggestions(query);
-  const scoreHistory = await appendScoreHistory(query, opportunityScore, avgViews);
+  const scoreHistory = await getScoreHistory(query);
 
   const evidence = {
     videoCount: videos.length,
@@ -261,12 +448,15 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
     medianViews: medianViews,
     bigChannelRatio: bigChannelRatio === null ? null : Number(bigChannelRatio.toFixed(2)),
     channelsWithKnownSubs: knownSubChannels.length,
+    uniqueChannelCount: channelIds.length,
     uploadsPerWeekInSample: uploadsPerWeek,
     daysSinceMostRecentUpload: daysSinceMostRecent,
     shortsShare: Number((shortsCount / videos.length).toFixed(2)),
     breakoutVideos: breakoutVideos.slice(0, 5),
+    breakoutVideoCount: breakoutVideos.length,
     opportunityScore: opportunityScore,
-    scoreFormula: 'min(60, log10(avgViews+1)*10) - (bigChannelRatio*30) + freshnessBonus(0/5/10). This is a transparent heuristic computed from real YouTube metadata — not a guarantee of results.',
+    scoreFormula: 'Weighted blend of Demand, Competition Opportunity, Momentum, and Evidence Confidence (Gap and Monetization are added once the AI synthesis step runs \u2014 see scoreBreakdown for the full transparent formula). Computed from real YouTube metadata, not a guarantee of results.',
+    scoreBreakdown: scoreBreakdown,
     topVideos: videos
       .slice()
       .sort(function (a, b) { return b.views - a.views; })
@@ -340,7 +530,9 @@ function buildSystemPrompt() {
     'Respond with STRICT JSON only, no markdown code fences, no commentary before or after, matching this shape exactly: ' +
     '{"opportunities":[{"angle":string,"rationale":string,"titleIdeas":[string,string,string,string,string]}],' +
     '"contentGap":string,"contentGapSource":"comments"|"patterns",' +
-    '"monetizationAngles":[{"type":string,"description":string}]}. ' +
+    '"monetizationAngles":[{"type":string,"description":string}],' +
+    '"gapScore":number,"gapScoreJustification":string,' +
+    '"monetizationScore":number,"monetizationScoreJustification":string}. ' +
     'Produce between 3 and 5 items in "opportunities". "rationale" must explicitly tie back to a real number from the evidence ' +
     '(e.g. "avg views of X across the sample" or "N of the top channels have 100k+ subscribers"). ' +
     '"titleIdeas" should be inspired by the style/phrasing of the real top-performing titles provided, but must be original wording, ' +
@@ -350,7 +542,12 @@ function buildSystemPrompt() {
     'otherwise infer it from title/view patterns and set "contentGapSource" to "patterns". ' +
     '"monetizationAngles" should list 2-4 realistic ways a creator could monetize content in this niche (e.g. affiliate, digital product, ' +
     'sponsorship, ad revenue, service/coaching), each a qualitative strategic description grounded in what the evidence shows about the niche ' +
-    '— never invent a specific dollar amount, RPM, or earnings figure; only Scott\u2019s own stated numbers (none given here) would be trustworthy for that.'
+    '— never invent a specific dollar amount, RPM, or earnings figure; only Scott\u2019s own stated numbers (none given here) would be trustworthy for that. ' +
+    '"gapScore" (0-100) is YOUR judgment of how underserved this angle is \u2014 how much real, specific demand (comments, autocomplete queries, ' +
+    'title patterns) exists for something the current top results DON\u2019T already cover well; 0 means thoroughly covered, 100 means a wide-open ' +
+    'gap. "monetizationScore" (0-100) is YOUR judgment of buyer intent and offer fit implied by the evidence (do viewers/searchers show signs of ' +
+    'wanting to solve a problem worth paying for?), never a revenue prediction. Both scores are explicitly your inference, not a measurement \u2014 ' +
+    'say so plainly in the one-sentence justification for each, and ground each justification in a specific piece of the evidence provided.'
   );
 }
 
@@ -369,6 +566,8 @@ function buildUserPrompt(query, evidence) {
   const autocompleteBlock = (evidence.autocompleteSuggestions && evidence.autocompleteSuggestions.length)
     ? evidence.autocompleteSuggestions.join(', ')
     : '(none returned)';
+  const componentByKey = {};
+  evidence.scoreBreakdown.components.forEach(function (c) { componentByKey[c.key] = c; });
 
   return (
     'TOPIC: ' + query + '\n\n' +
@@ -380,7 +579,9 @@ function buildUserPrompt(query, evidence) {
     '- Uploads per week in this sample: ' + evidence.uploadsPerWeekInSample + '\n' +
     '- Days since the most recent upload in this sample: ' + evidence.daysSinceMostRecentUpload + '\n' +
     '- Share of results that are Shorts: ' + Math.round(evidence.shortsShare * 100) + '%\n' +
-    '- Opportunity Score (0-100, deterministic formula, not AI-generated): ' + evidence.opportunityScore + '\n\n' +
+    '- Deterministic scores already computed from this evidence (0-100, not AI-generated \u2014 use these as context, don\u2019t restate them): ' +
+    'Demand ' + componentByKey.demand.value + ', Competition Opportunity ' + componentByKey.competitionOpportunity.value +
+    ', Momentum ' + componentByKey.momentum.value + ', Evidence Confidence ' + componentByKey.evidenceConfidence.value + '.\n\n' +
     'TOP PERFORMING VIDEOS IN THIS SAMPLE:\n' + topTitles + '\n\n' +
     'BREAKOUT VIDEOS (outperformed their own channel\u2019s sampled average by 2x+):\n' + breakouts + '\n\n' +
     'REAL VIEWER COMMENTS from the highest-viewed videos in this sample (use these to ground the content gap when they reveal a recurring need):\n' + commentsBlock + '\n\n' +
@@ -473,6 +674,10 @@ async function runAiSynthesis(provider, apiKey, model, query, evidence) {
   }
   if (!Array.isArray(parsed.monetizationAngles)) parsed.monetizationAngles = [];
   if (!parsed.contentGapSource) parsed.contentGapSource = 'patterns';
+  parsed.gapScore = (typeof parsed.gapScore === 'number' && isFinite(parsed.gapScore)) ? Math.max(0, Math.min(100, Math.round(parsed.gapScore))) : null;
+  parsed.monetizationScore = (typeof parsed.monetizationScore === 'number' && isFinite(parsed.monetizationScore)) ? Math.max(0, Math.min(100, Math.round(parsed.monetizationScore))) : null;
+  if (typeof parsed.gapScoreJustification !== 'string') parsed.gapScoreJustification = null;
+  if (typeof parsed.monetizationScoreJustification !== 'string') parsed.monetizationScoreJustification = null;
   return parsed;
 }
 
@@ -525,7 +730,37 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
     return { evidence: evidence, ai: null };
   }
   const ai = await runAiSynthesis(aiProvider, aiApiKey, aiModel, query, evidence);
-  return { evidence: evidence, ai: ai };
+
+  // Enrich the evidence-only score with the AI's Gap/Monetization judgment,
+  // now that it exists. The underlying YouTube evidence may have come from
+  // cache, but this combined score never is \u2014 it reflects THIS call's AI
+  // response. A fresh score-history point is only recorded when the
+  // underlying evidence was ALSO freshly fetched, preserving the existing
+  // "one point per real data refresh" behavior rather than one per AI call.
+  const fullBreakdown = buildScoreBreakdown(evidence, {
+    gapScore: ai.gapScore,
+    gapScoreJustification: ai.gapScoreJustification,
+    monetizationScore: ai.monetizationScore,
+    monetizationScoreJustification: ai.monetizationScoreJustification
+  }, 'full');
+
+  const enrichedEvidence = Object.assign({}, evidence, {
+    opportunityScore: fullBreakdown.overall.value,
+    scoreFormula: 'Weighted blend of Demand, Competition Opportunity, Momentum, Content Gap, Monetization Potential, and Evidence Confidence (Execution Fit is unscored and its weight redistributed \u2014 see scoreBreakdown for the full formula, weights, and inputs).',
+    scoreBreakdown: fullBreakdown
+  });
+
+  if (!evidence.fromCache) {
+    enrichedEvidence.scoreHistory = await appendScoreHistory(query, fullBreakdown.overall.value, evidence.avgViews);
+  } else {
+    // The cached evidence's own embedded scoreHistory was frozen at the
+    // moment it was cached — a later fresh scan of this same query could
+    // have appended a point since then. Re-fetch live so the chart never
+    // silently misses a point that actually exists in storage.
+    enrichedEvidence.scoreHistory = await getScoreHistory(query);
+  }
+
+  return { evidence: enrichedEvidence, ai: ai };
 }
 
 // ===========================================================================
@@ -571,6 +806,7 @@ module.exports = {
   normalizeQueryKey: normalizeQueryKey,
   saveToHistory: saveToHistory,
   gatherAutocompleteSuggestions: gatherAutocompleteSuggestions,
+  buildScoreBreakdown: buildScoreBreakdown,
   YT_BASE: YT_BASE,
   fetchJson: fetchJson
 };
