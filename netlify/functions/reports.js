@@ -433,12 +433,12 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
     '"marketOpportunity":string,"audienceInsight":string,"keyRisks":[string,string,string],' +
     '"rankedItems":[{"query":string,"reason":string}],"crossCuttingThemes":[string,string],' +
     '"recommendedNextActions":[string,string,string],' +
-    '"next30Days":[{"phase":string,"action":string,"successMeasure":string}],' +
+    '"next30Days":[{"phase":string,"days":string,"priority":"High"|"Medium"|"Low","channel":string,"objective":string,"action":string,"deliverables":[string,string],"successMeasure":string}],' +
     '"monetizationRoadmap":[{"query":string,"angle":string,"sequencing":string}],' +
     '"contentCalendar":[{"query":string,"dayOffset":number,"format":"Short"|"Long-form","rationale":string}]}. ' +
     '"overview" is a sharp 2-3 sentence executive opening, not filler. "verdict" gives a realistic decision and evidence-based reason. ' +
     '"marketOpportunity" explains the strongest opening; "audienceInsight" states the clearest audience need visible in the supplied findings. ' +
-    '"keyRisks" lists three concrete risks. "next30Days" contains 3-5 sequenced phases with a measurable success signal. ' +
+    '"keyRisks" lists three concrete risks. "next30Days" contains 4-6 sequenced execution milestones covering Days 1-30. Each milestone needs a specific objective, action, 2-4 tangible deliverables, channel, realistic priority, and measurable success signal. ' +
     '"rankedItems" must list the included items in the order you\u2019d prioritize acting on them, citing each one\u2019s real score in "reason". ' +
     '"crossCuttingThemes" are patterns visible across multiple items (shared content gaps, recurring monetization angles, etc.) — ' +
     'only include a theme if it genuinely shows up in two or more items. ' +
@@ -489,7 +489,7 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: model || 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
+        max_tokens: 2600,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }]
       })
@@ -554,8 +554,9 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
   parsed.marketOpportunity = typeof parsed.marketOpportunity === 'string' ? parsed.marketOpportunity : parsed.overview;
   parsed.audienceInsight = typeof parsed.audienceInsight === 'string' ? parsed.audienceInsight : '';
   parsed.keyRisks = Array.isArray(parsed.keyRisks) ? parsed.keyRisks.filter(function (v) { return typeof v === 'string'; }).slice(0, 5) : [];
-  parsed.next30Days = Array.isArray(parsed.next30Days) ? parsed.next30Days.filter(function (v) { return v && typeof v.action === 'string'; }).map(function (v) {
-    return { phase: typeof v.phase === 'string' ? v.phase : 'Next', action: v.action, successMeasure: typeof v.successMeasure === 'string' ? v.successMeasure : '' };
+  parsed.next30Days = Array.isArray(parsed.next30Days) ? parsed.next30Days.filter(function (v) { return v && typeof v.action === 'string'; }).map(function (v, i) {
+    const priority = ['High', 'Medium', 'Low'].indexOf(v.priority) !== -1 ? v.priority : 'High';
+    return { phase: typeof v.phase === 'string' ? v.phase : 'Milestone ' + (i + 1), days: typeof v.days === 'string' ? v.days : 'Days ' + (i * 7 + 1) + '-' + Math.min(30, i * 7 + 7), priority: priority, channel: typeof v.channel === 'string' ? v.channel : '', objective: typeof v.objective === 'string' ? v.objective : '', action: v.action, deliverables: Array.isArray(v.deliverables) ? v.deliverables.filter(function (d) { return typeof d === 'string'; }).slice(0, 4) : [], successMeasure: typeof v.successMeasure === 'string' ? v.successMeasure : '' };
   }).slice(0, 6) : [];
 
   // These two fields are new and have a stricter shape (numbers, an enum)
