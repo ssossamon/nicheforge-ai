@@ -632,11 +632,24 @@
         <div class="weight-row"><label for="w-momentum">Momentum</label><input type="number" id="w-momentum" min="0" step="1" value="15" /></div>
         <div class="weight-row"><label for="w-gap">Content Gap (AI judgment)</label><input type="number" id="w-gap" min="0" step="1" value="20" /></div>
         <div class="weight-row"><label for="w-monetization">Monetization Potential (AI judgment)</label><input type="number" id="w-monetization" min="0" step="1" value="15" /></div>
+        <div class="weight-row"><label for="w-execution">Execution Fit (your readiness)</label><input type="number" id="w-execution" min="0" step="1" value="10" /></div>
         <div class="weight-row"><label for="w-confidence">Evidence Confidence</label><input type="number" id="w-confidence" min="0" step="1" value="5" /></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
         <span class="muted-lo" style="font-size:12px;" id="weight-total-line">Total: 90</span>
         <button class="btn btn-ghost" id="btn-reset-weights" type="button" style="padding:4px 10px;font-size:11.5px;">Reset to defaults</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:18px;border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label>Execution profile</label>
+      <div class="helper">Used only for the transparent Execution Fit score. Choose your current capacity; these answers stay in this browser.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+        <select id="s-experience"><option value="">Experience</option><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select>
+        <select id="s-hours"><option value="">Hours per week</option><option value="under3">Under 3</option><option value="3to5">3–5</option><option value="6to10">6–10</option><option value="over10">More than 10</option></select>
+        <select id="s-budget"><option value="">Monthly test budget</option><option value="none">No budget</option><option value="under100">Under $100</option><option value="100to500">$100–$500</option><option value="over500">More than $500</option></select>
+        <select id="s-team"><option value="">Team capacity</option><option value="solo">Solo</option><option value="small">Small team/contractors</option><option value="established">Established team</option></select>
+        <select id="s-distribution" style="grid-column:1/-1;"><option value="">Existing audience/distribution</option><option value="none">Starting from zero</option><option value="building">Building an audience</option><option value="established">Established audience/list</option></select>
       </div>
     </div>
 
@@ -825,23 +838,11 @@ function lsSet(key, val) {
 function el(id) { return document.getElementById(id); }
 if (el('footer-year')) el('footer-year').textContent = new Date().getFullYear();
 
-var OWNER_KEY = 'NFORGE-ADM-SCOTT-2026';
-
 function ensureEmail(callback) {
   var stored = lsGet('email');
   if (stored) { callback(stored); return; }
   var fieldEmail = el('f-email').value.trim();
   if (fieldEmail) { callback(fieldEmail); return; }
-  var activeLicense = (lsGet('license_key') || '').trim().toUpperCase();
-  if (activeLicense === OWNER_KEY) {
-    // Owner testing with the admin key active — skip the lead-capture
-    // modal entirely, no need to collect your own email for your own tool.
-    var ownerEmail = 'owner@nicheforge.local';
-    lsSet('email', ownerEmail);
-    el('f-email').value = ownerEmail;
-    callback(ownerEmail);
-    return;
-  }
   el('email-modal').className = 'modal-veil open';
   var handler = function () {
     var val = el('modal-email').value.trim();
@@ -882,7 +883,7 @@ function updateSettingsStatusLine() {
   line.textContent = providerLabel + ' key saved \u00B7 ' + ytPart + '.';
 }
 
-var DEFAULT_SCORE_WEIGHTS_PCT = { demand: 20, competitionOpportunity: 15, momentum: 15, gap: 20, monetization: 15, evidenceConfidence: 5 };
+var DEFAULT_SCORE_WEIGHTS_PCT = { demand: 20, competitionOpportunity: 15, momentum: 15, gap: 20, monetization: 15, executionFit: 10, evidenceConfidence: 5 };
 
 function openSettingsModal() {
   var provider = lsGet('ai_provider');
@@ -894,6 +895,12 @@ function openSettingsModal() {
   el('test-key-status').textContent = '';
   el('settings-save-status').textContent = '';
   loadWeightInputs(getSavedScoreWeights() || DEFAULT_SCORE_WEIGHTS_PCT);
+  var profile = getExecutionProfile();
+  el('s-experience').value = profile.experience || '';
+  el('s-hours').value = profile.hoursPerWeek || '';
+  el('s-budget').value = profile.budget || '';
+  el('s-team').value = profile.team || '';
+  el('s-distribution').value = profile.distribution || '';
   el('settings-modal').className = 'modal-veil open';
 }
 
@@ -903,6 +910,7 @@ function loadWeightInputs(weights) {
   el('w-momentum').value = weights.momentum;
   el('w-gap').value = weights.gap;
   el('w-monetization').value = weights.monetization;
+  el('w-execution').value = weights.executionFit === undefined ? 10 : weights.executionFit;
   el('w-confidence').value = weights.evidenceConfidence;
   updateWeightTotal();
 }
@@ -914,24 +922,25 @@ function readWeightInputs() {
     momentum: parseFloat(el('w-momentum').value) || 0,
     gap: parseFloat(el('w-gap').value) || 0,
     monetization: parseFloat(el('w-monetization').value) || 0,
+    executionFit: parseFloat(el('w-execution').value) || 0,
     evidenceConfidence: parseFloat(el('w-confidence').value) || 0
   };
 }
 
 function updateWeightTotal() {
   var w = readWeightInputs();
-  var total = w.demand + w.competitionOpportunity + w.momentum + w.gap + w.monetization + w.evidenceConfidence;
+  var total = w.demand + w.competitionOpportunity + w.momentum + w.gap + w.monetization + w.executionFit + w.evidenceConfidence;
   var line = el('weight-total-line');
   if (total <= 0) {
     line.className = 'muted-lo weight-total-bad';
     line.textContent = 'Total: 0 \u2014 set at least one above zero, or these will be ignored and defaults used.';
   } else {
     line.className = 'muted-lo';
-    line.textContent = 'Total: ' + total + ' (only relative size matters \u2014 Execution Fit reserves the rest, unscored)';
+    line.textContent = 'Total: ' + total + (total === 100 ? ' \u2713' : ' (normalized automatically)');
   }
 }
 
-['w-demand', 'w-competition', 'w-momentum', 'w-gap', 'w-monetization', 'w-confidence'].forEach(function (id) {
+['w-demand', 'w-competition', 'w-momentum', 'w-gap', 'w-monetization', 'w-execution', 'w-confidence'].forEach(function (id) {
   el(id).addEventListener('input', updateWeightTotal);
 });
 
@@ -1211,12 +1220,13 @@ el('btn-save-settings').addEventListener('click', function () {
   lsSet('youtube_key', ytKey);
 
   var weights = readWeightInputs();
-  var weightSum = weights.demand + weights.competitionOpportunity + weights.momentum + weights.gap + weights.monetization + weights.evidenceConfidence;
+  var weightSum = weights.demand + weights.competitionOpportunity + weights.momentum + weights.gap + weights.monetization + weights.executionFit + weights.evidenceConfidence;
   if (weightSum > 0) {
     lsSet('score_weights', JSON.stringify(weights));
   } else {
     lsSet('score_weights', '');
   }
+  lsSet('execution_profile', JSON.stringify(readExecutionProfile()));
 
   updateSettingsStatusLine();
   statusEl.className = 'status-line status-ok';
@@ -1383,6 +1393,22 @@ function getSavedScoreWeights() {
   }
 }
 
+function readExecutionProfile() {
+  return {
+    experience: el('s-experience').value,
+    hoursPerWeek: el('s-hours').value,
+    budget: el('s-budget').value,
+    team: el('s-team').value,
+    distribution: el('s-distribution').value
+  };
+}
+
+function getExecutionProfile() {
+  var raw = lsGet('execution_profile');
+  if (!raw) return {};
+  try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+}
+
 function doScan(query, email) {
   var provider = lsGet('ai_provider') || 'openai';
   var apiKey = lsGet('ai_key') || '';
@@ -1408,7 +1434,8 @@ function doScan(query, email) {
       youtubeApiKey: youtubeKey,
       skipCache: skipCache,
       licenseKey: lsGet('license_key') || '',
-      scoreWeights: getSavedScoreWeights()
+      scoreWeights: getSavedScoreWeights(),
+      executionProfile: getExecutionProfile()
     })
   })
     .then(function (r) { return r.json(); })
@@ -1458,7 +1485,8 @@ function doBatchScan(topics, email) {
       youtubeApiKey: youtubeKey,
       skipCache: skipCache,
       licenseKey: lsGet('license_key') || '',
-      scoreWeights: getSavedScoreWeights()
+      scoreWeights: getSavedScoreWeights(),
+      executionProfile: getExecutionProfile()
     })
   })
     .then(function (r) { return r.json(); })

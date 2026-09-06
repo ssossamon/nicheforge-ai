@@ -136,6 +136,21 @@ function computeEvidenceConfidenceScore(evidence) {
   return clampScore(sampleSize + completeness + recency);
 }
 
+function computeExecutionFitScore(profile) {
+  if (!profile || typeof profile !== 'object') return null;
+  const maps = {
+    experience: { beginner: 45, intermediate: 70, advanced: 90 },
+    hoursPerWeek: { under3: 35, '3to5': 55, '6to10': 75, over10: 95 },
+    budget: { none: 40, under100: 55, '100to500': 75, over500: 90 },
+    team: { solo: 60, small: 80, established: 90 },
+    distribution: { none: 40, building: 65, established: 90 }
+  };
+  const values = Object.keys(maps).map(function (key) { return maps[key][profile[key]]; })
+    .filter(function (value) { return typeof value === 'number'; });
+  if (values.length < 3) return null;
+  return clampScore(values.reduce(function (sum, value) { return sum + value; }, 0) / values.length);
+}
+
 function scoreBandLabel(score) {
   if (score >= 80) return 'Strong';
   if (score >= 65) return 'Promising';
@@ -156,7 +171,7 @@ function scoreBandLabel(score) {
 // fat-fingering "60, 60, 60..." doesn't silently break the math.
 function normalizeCustomWeights(rawWeights) {
   if (!rawWeights || typeof rawWeights !== 'object') return null;
-  const adjustableKeys = ['demand', 'competitionOpportunity', 'momentum', 'gap', 'monetization', 'evidenceConfidence'];
+  const adjustableKeys = ['demand', 'competitionOpportunity', 'momentum', 'gap', 'monetization', 'executionFit', 'evidenceConfidence'];
   // All-or-nothing: mixing a partial set of user-provided values (often on
   // a 0-100 percentage-like scale) with default fallback values (0-0.20
   // fractions) for the missing ones would badly skew the result toward
@@ -169,9 +184,8 @@ function normalizeCustomWeights(rawWeights) {
   if (!allValid) return null;
   const sum = adjustableKeys.reduce(function (a, key) { return a + rawWeights[key]; }, 0);
   if (sum <= 0) return null;
-  const adjustableShare = 1 - SCORE_WEIGHTS.executionFit; // 0.90 by default \u2014 Execution Fit's reserved share stays reserved
-  const normalized = { executionFit: 0 };
-  adjustableKeys.forEach(function (key) { normalized[key] = rawWeights[key] / sum * adjustableShare; });
+  const normalized = {};
+  adjustableKeys.forEach(function (key) { normalized[key] = rawWeights[key] / sum; });
   // The six adjustable components always share that same 90% (Execution
   // Fit's reserved slice stays reserved, unscored, exactly as in the
   // default weights) — a user can shift emphasis AMONG the six, not claim
@@ -208,13 +222,14 @@ function combineWeighted(componentValues, weights) {
 // and band. `stage` records whether this reflects evidence-only scoring
 // (no AI ever ran — the watchlist background recheck path) or the fuller
 // AI-enriched version an interactive scan produces.
-function buildScoreBreakdown(evidence, aiScores, stage, customWeights) {
+function buildScoreBreakdown(evidence, aiScores, stage, customWeights, executionProfile) {
   const demand = computeDemandScore(evidence);
   const competitionOpportunity = computeCompetitionOpportunityScore(evidence);
   const momentum = computeMomentumScore(evidence);
   const evidenceConfidence = computeEvidenceConfidenceScore(evidence);
   const gap = aiScores && typeof aiScores.gapScore === 'number' ? clampScore(aiScores.gapScore) : null;
   const monetization = aiScores && typeof aiScores.monetizationScore === 'number' ? clampScore(aiScores.monetizationScore) : null;
+  const executionFit = computeExecutionFitScore(executionProfile);
   const activeWeights = customWeights || SCORE_WEIGHTS;
 
   const combo = combineWeighted({
@@ -223,8 +238,8 @@ function buildScoreBreakdown(evidence, aiScores, stage, customWeights) {
     momentum: momentum,
     gap: gap,
     monetization: monetization,
+    executionFit: executionFit,
     evidenceConfidence: evidenceConfidence
-    // executionFit intentionally omitted: no execution-profile input exists yet.
   }, activeWeights);
 
   const components = [
@@ -259,9 +274,10 @@ function buildScoreBreakdown(evidence, aiScores, stage, customWeights) {
       justification: (aiScores && aiScores.monetizationScoreJustification) || null
     },
     {
-      key: 'executionFit', label: 'Execution Fit', value: null, provenance: 'Not scored',
-      weight: 0, rawWeight: activeWeights.executionFit,
-      formula: 'Needs your own skills/time/resources profile, which NicheForge doesn\u2019t collect yet \u2014 its 10% weight is redistributed across the other components below rather than guessed.'
+      key: 'executionFit', label: 'Execution Fit', value: executionFit, provenance: executionFit === null ? 'Not available' : 'Computed',
+      weight: combo.reweighted.executionFit || 0, rawWeight: activeWeights.executionFit,
+      formula: executionFit === null ? 'Complete at least three Execution Profile fields in Settings; the unavailable weight is transparently redistributed.' : 'Average of fixed readiness points for experience, weekly time, budget, team capacity, and existing distribution.',
+      inputs: executionFit === null ? null : executionProfile
     },
     {
       key: 'evidenceConfidence', label: 'Evidence Confidence', value: evidenceConfidence, provenance: 'Computed',
@@ -277,7 +293,7 @@ function buildScoreBreakdown(evidence, aiScores, stage, customWeights) {
     components: components,
     customWeightsApplied: !!customWeights,
     weightsNote: (customWeights ? 'Using your custom weights (Settings \u2192 Score weights). ' : '') +
-      'Execution Fit is unscored (no execution profile provided), so its reserved share was redistributed proportionally across the other six components below.',
+      (executionFit === null ? 'Execution Fit is unavailable, so its weight was redistributed proportionally across available components.' : 'Execution Fit uses the readiness profile saved in Settings.'),
     computedAt: new Date().toISOString()
   };
 }
@@ -801,7 +817,7 @@ async function fetchJson(url, options) {
 // Combined single-topic pipeline: evidence + AI synthesis
 // ===========================================================================
 
-async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, rawCustomWeights) {
+async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, rawCustomWeights, executionProfile) {
   const evidence = await gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache);
   if (evidence.videoCount === 0) {
     return { evidence: evidence, ai: null };
@@ -820,11 +836,11 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
     gapScoreJustification: ai.gapScoreJustification,
     monetizationScore: ai.monetizationScore,
     monetizationScoreJustification: ai.monetizationScoreJustification
-  }, 'full', customWeights);
+  }, 'full', customWeights, executionProfile);
 
   const enrichedEvidence = Object.assign({}, evidence, {
     opportunityScore: fullBreakdown.overall.value,
-    scoreFormula: 'Weighted blend of Demand, Competition Opportunity, Momentum, Content Gap, Monetization Potential, and Evidence Confidence (Execution Fit is unscored and its weight redistributed \u2014 see scoreBreakdown for the full formula, weights, and inputs).',
+    scoreFormula: 'Weighted blend of Demand, Competition Opportunity, Momentum, Content Gap, Monetization Potential, Execution Fit when configured, and Evidence Confidence. Missing components are transparently reweighted.',
     scoreBreakdown: fullBreakdown
   });
 

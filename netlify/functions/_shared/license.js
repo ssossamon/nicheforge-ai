@@ -17,14 +17,8 @@ const TIER_PRICE_USD = {
   AGN: 197
 };
 
-// -----------------------------------------------------------------------
-// SAFETY NOTE: this is Scott's personal convenience override so he is never
-// locked out of his own product's paid features. It must NOT ship to buyers
-// as a discoverable bypass beyond what's needed for him to activate it once.
-// It only unlocks the ADM tier for the literal owner key string below — it
-// does not weaken verification for any buyer-purchased key.
-// -----------------------------------------------------------------------
-const OWNER_KEY = 'NFORGE-ADM-SCOTT-2026';
+// Owner access is server-only. Never fall back to a source-controlled key.
+const OWNER_KEY = String(process.env.ADMIN_KEY || '').trim().toUpperCase();
 
 function randomBase32(length) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
@@ -68,7 +62,7 @@ function parseLicenseKey(key) {
 }
 
 function isOwnerKey(key) {
-  return typeof key === 'string' && key.trim().toUpperCase() === OWNER_KEY;
+  return OWNER_KEY.length > 0 && typeof key === 'string' && key.trim().toUpperCase() === OWNER_KEY;
 }
 
 module.exports = {

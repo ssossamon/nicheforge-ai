@@ -33,6 +33,7 @@ exports.handler = async function (event) {
   const aiModel = payload.aiModel ? String(payload.aiModel).trim() : '';
   const clientYoutubeKey = payload.youtubeApiKey ? String(payload.youtubeApiKey).trim() : '';
   const customWeights = (payload.scoreWeights && typeof payload.scoreWeights === 'object') ? payload.scoreWeights : null;
+  const executionProfile = (payload.executionProfile && typeof payload.executionProfile === 'object') ? payload.executionProfile : null;
   const skipCache = payload.skipCache === true;
 
   if (!query) {
@@ -97,7 +98,7 @@ exports.handler = async function (event) {
 
   let result;
   try {
-    result = await core.runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, customWeights);
+    result = await core.runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiApiKey, aiModel, customWeights, executionProfile);
   } catch (e) {
     return http.fail(
       e.statusCode || 502,

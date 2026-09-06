@@ -1,4 +1,4 @@
-# NicheForge AI (v1.0)
+# NicheForge AI (v2.8)
 
 Real YouTube search data + your own AI provider (BYOK) → ranked content/niche
 opportunities, a content gap callout, and video title ideas for video and
@@ -44,19 +44,14 @@ unset until you provide the real accounts/keys:
 | `PAYPAL_CLIENT_ID` / `PAYPAL_SECRET` | developer.paypal.com → your app's Live credentials | Pricing section shows "checkout not configured"; no purchases possible |
 | `PAYPAL_ENV` | set to `sandbox` while testing, omit (defaults to `live`) for real sales | — |
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Resend dashboard | License keys still issued and shown on-screen, just not emailed |
-| `ADMIN_KEY` | any string you choose | Falls back to the owner key value below — set a real one before going live |
+| `ADMIN_KEY` | generate a private high-entropy value | Admin and owner access are unavailable until this is configured privately in Netlify |
 
-## Your owner key
+## Owner access
 
-Enter this in the app's "Activate license" box (or the admin panel) to
-unlock every tier without going through checkout:
-
-**`NFORGE-ADM-SCOTT-2026`**
-
-This is hardcoded as a safety-net bypass — see the comment above `OWNER_KEY`
-in `netlify/functions/_shared/license.js`. It only ever unlocks the literal
-owner key string; it does not weaken verification for any buyer-purchased
-key.
+Set a private, high-entropy `ADMIN_KEY` in the Netlify environment. The value
+is never stored in this repository or rendered into the browser bundle. The
+same private value can be entered in the license activation or admin screen
+to unlock owner access.
 
 ## Data model (Netlify Blobs stores)
 
@@ -113,7 +108,7 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
-## v2.1 — Transparent, deterministic scoring engine (Demand/Competition/Momentum/Gap/Monetization/Evidence Confidence)
+## v2.1–v2.8 — Transparent scoring engine and real Execution Fit
 
 The old Opportunity Score was one blended formula (`log(views) - saturation
 + freshness`). This breaks it into 6 named, individually-inspectable
@@ -130,12 +125,12 @@ drawer under every niche scan result:
   honestly produce from view counts alone, so they come from the AI
   synthesis call and are always labeled "AI Inference" in the drawer, with
   a one-sentence justification \u2014 never presented as computed.
-- **Execution Fit** \u2014 intentionally left unscored. It would need a user's
-  own skills/time/resources profile, which NicheForge doesn't collect. Its
-  10% weight is redistributed proportionally across the other six
-  components rather than guessed \u2014 the drawer shows this reweighting
-  explicitly, and unit tests confirm the reweighted percentages always sum
-  to exactly 100% regardless of which components are available.
+- **Execution Fit (v2.8)** — Settings now collects an optional readiness
+  profile covering experience, weekly time, validation budget, team capacity,
+  and existing audience/distribution. A fixed, visible points table computes
+  the score; AI does not grade the user's readiness. At least three answers
+  are required. If the profile is absent, Execution Fit remains unavailable
+  and its weight is transparently redistributed rather than guessed.
 
 **A real architectural constraint drove a two-stage design.**
 `watchlist-recheck.js` runs as a scheduled background job with no AI key
