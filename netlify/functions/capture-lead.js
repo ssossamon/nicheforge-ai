@@ -65,7 +65,7 @@ exports.handler = async function (event) {
 
   try {
     const leadsStore = getStore('nforge-leads', { consistency: 'strong' });
-    const existing = await leadsStore.get(email, { type: 'json' });
+    const existing = await leadsStore.get(http.safeKey(email), { type: 'json' });
     const record = {
       email: email,
       name: name || (existing && existing.name) || '',
@@ -75,7 +75,7 @@ exports.handler = async function (event) {
       firstSeenAt: (existing && existing.firstSeenAt) || new Date().toISOString(),
       lastSeenAt: new Date().toISOString()
     };
-    await leadsStore.setJSON(email, record);
+    await leadsStore.setJSON(http.safeKey(email), record);
   } catch (e) {
     // If Blobs itself is unavailable, still tell the truth about ESP sync
     // rather than silently pretending everything succeeded.

@@ -72,7 +72,7 @@ exports.handler = async function (event) {
       }
     }
     if (!unlimited) {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = usageRaw && usageRaw.count ? usageRaw.count : 0;
       if (usedCount + queries.length > FREE_SCAN_LIMIT) {
         return http.fail(
@@ -135,9 +135,9 @@ exports.handler = async function (event) {
   const successCount = results.filter(function (r) { return r.success; }).length;
   try {
     if (!unlimited && successCount > 0) {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = (usageRaw && usageRaw.count ? usageRaw.count : 0) + successCount;
-      await usageStore.setJSON(email, { count: usedCount, lastScanAt: new Date().toISOString() });
+      await usageStore.setJSON(http.safeKey(email), { count: usedCount, lastScanAt: new Date().toISOString() });
     }
     for (let j = 0; j < results.length; j++) {
       if (!results[j].success) continue;
@@ -150,7 +150,7 @@ exports.handler = async function (event) {
   let scansRemaining = null;
   if (!unlimited) {
     try {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = usageRaw && usageRaw.count ? usageRaw.count : successCount;
       scansRemaining = Math.max(0, FREE_SCAN_LIMIT - usedCount);
     } catch (e) {

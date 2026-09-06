@@ -13,7 +13,9 @@ const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function normalizeQueryKey(query) {
-  return String(query).trim().toLowerCase().replace(/\s+/g, ' ');
+  // URL-encoded because raw spaces in a Blobs key have shown a mismatch
+  // between what list() reports and what get() returns for that same key.
+  return encodeURIComponent(String(query).trim().toLowerCase().replace(/\s+/g, ' '));
 }
 
 async function getCachedEvidence(query) {
@@ -535,7 +537,7 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
 async function saveToHistory(email, query, evidence, ai) {
   try {
     const store = getStore('nforge-history', { consistency: 'strong' });
-    const id = email + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
+    const id = encodeURIComponent(email) + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
     await store.setJSON(id, {
       id: id,
       email: email,

@@ -39,7 +39,7 @@ exports.handler = async function (event) {
 
   if (action === 'list') {
     try {
-      const listing = await store.list({ prefix: email + '::' });
+      const listing = await store.list({ prefix: http.safeKey(email) + '::' });
       const summaries = [];
       for (const item of listing.blobs) {
         const rec = await store.get(item.key, { type: 'json' });
@@ -56,7 +56,7 @@ exports.handler = async function (event) {
 
   if (action === 'get') {
     const id = String(payload.id || '');
-    if (!id || id.indexOf(email + '::') !== 0) {
+    if (!id || id.indexOf(http.safeKey(email) + '::') !== 0) {
       return http.fail(400, 'invalid_id', 'That history entry does not belong to this email.');
     }
     try {
@@ -70,7 +70,7 @@ exports.handler = async function (event) {
 
   if (action === 'delete') {
     const id = String(payload.id || '');
-    if (!id || id.indexOf(email + '::') !== 0) {
+    if (!id || id.indexOf(http.safeKey(email) + '::') !== 0) {
       return http.fail(400, 'invalid_id', 'That history entry does not belong to this email.');
     }
     try {

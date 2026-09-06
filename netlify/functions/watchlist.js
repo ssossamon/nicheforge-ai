@@ -36,7 +36,8 @@ exports.handler = async function (event) {
     return http.fail(500, 'storage_unavailable', 'Watchlist storage is not available: ' + e.message);
   }
 
-  const key = email + '::' + query.toLowerCase();
+  const keyPrefix = http.safeKey(email) + '::';
+  const key = keyPrefix + http.safeKey(query.toLowerCase());
 
   if (action === 'add') {
     if (!query) return http.fail(400, 'missing_query', 'No topic was provided.');
@@ -84,7 +85,7 @@ exports.handler = async function (event) {
 
   if (action === 'list') {
     try {
-      const listing = await store.list({ prefix: email + '::' });
+      const listing = await store.list({ prefix: keyPrefix });
       const items = [];
       for (const item of listing.blobs) {
         const rec = await store.get(item.key, { type: 'json' });
@@ -97,23 +98,6 @@ exports.handler = async function (event) {
     }
   }
 
-  if (action === 'debug_raw') {
-    try {
-      const allListing = await store.list();
-      const directGet = await store.get(key, { type: 'json' });
-      return http.json(200, {
-        success: true,
-        debug: {
-          expectedKey: key,
-          directGetResult: directGet,
-          allKeysInStore: allListing.blobs.map(function (b) { return b.key; }),
-          prefixUsedForList: email + '::'
-        }
-      });
-    } catch (e) {
-      return http.fail(500, 'debug_failed', e.message);
-    }
-  }
 
   return http.fail(400, 'unknown_action', 'Unknown action: ' + action);
 };

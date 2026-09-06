@@ -55,6 +55,14 @@ function validEmail(email) {
   return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
+// Netlify Blobs keys built from raw strings containing '@', spaces, or ':'
+// have shown a mismatch between what list() reports and what get() returns
+// for the same key. Always run any dynamic key component through this
+// before concatenating it into a Blobs key.
+function safeKey(str) {
+  return encodeURIComponent(String(str));
+}
+
 module.exports = {
   CORS_HEADERS: CORS_HEADERS,
   json: json,
@@ -62,5 +70,6 @@ module.exports = {
   fail: fail,
   isPreflight: isPreflight,
   preflightResponse: preflightResponse,
-  validEmail: validEmail
+  validEmail: validEmail,
+  safeKey: safeKey
 };

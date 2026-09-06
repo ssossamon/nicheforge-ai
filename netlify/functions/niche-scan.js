@@ -66,7 +66,7 @@ exports.handler = async function (event) {
     }
 
     if (!unlimited) {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = usageRaw && usageRaw.count ? usageRaw.count : 0;
       if (usedCount >= FREE_SCAN_LIMIT) {
         return http.fail(
@@ -121,9 +121,9 @@ exports.handler = async function (event) {
   // ---- 3. Record usage + save to history ----------------------------------
   try {
     if (!unlimited) {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = (usageRaw && usageRaw.count ? usageRaw.count : 0) + 1;
-      await usageStore.setJSON(email, { count: usedCount, lastScanAt: new Date().toISOString() });
+      await usageStore.setJSON(http.safeKey(email), { count: usedCount, lastScanAt: new Date().toISOString() });
     }
     await core.saveToHistory(email, query, evidence, result.ai);
   } catch (e) {
@@ -133,7 +133,7 @@ exports.handler = async function (event) {
   let scansRemaining = null;
   if (!unlimited) {
     try {
-      const usageRaw = await usageStore.get(email, { type: 'json' });
+      const usageRaw = await usageStore.get(http.safeKey(email), { type: 'json' });
       const usedCount = usageRaw && usageRaw.count ? usageRaw.count : 1;
       scansRemaining = Math.max(0, FREE_SCAN_LIMIT - usedCount);
     } catch (e) {
