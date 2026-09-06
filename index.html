@@ -211,11 +211,21 @@
 
     <div class="scan-panel" id="scan">
       <h3>Run a niche scan</h3>
-      <div class="h3sub">Takes about 15 seconds.</div>
+      <div class="h3sub">Takes about 15 seconds per topic.</div>
 
-      <div class="field">
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-ghost" id="mode-single-btn" type="button" style="flex:1;background:var(--ink);color:#fff;">Single topic</button>
+        <button class="btn btn-ghost" id="mode-batch-btn" type="button" style="flex:1;">Batch (up to 5)</button>
+      </div>
+
+      <div class="field" id="single-query-field">
         <label for="f-query">Topic or niche</label>
         <input type="text" id="f-query" placeholder="e.g. budget home espresso setups" />
+      </div>
+
+      <div class="field" id="batch-query-field" style="display:none;">
+        <label for="f-batch-queries">Topics — one per line, up to 5</label>
+        <textarea id="f-batch-queries" rows="5" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="budget home espresso setups&#10;pour over coffee for beginners&#10;cold brew at home"></textarea>
       </div>
 
       <div class="field">
@@ -233,6 +243,11 @@
           <button class="btn btn-ghost" id="btn-open-settings" type="button" style="width:100%;">Open Settings</button>
         </div>
       </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-lo);margin:4px 0 0;">
+        <input type="checkbox" id="f-skip-cache" style="width:auto;" />
+        Force fresh data (skip the 24-hour cache)
+      </label>
 
       <div style="margin-top:16px;">
         <button class="btn btn-primary" id="btn-scan" type="button">Run niche scan</button>
@@ -451,7 +466,15 @@
   </div>
 </div>
 
+<div class="modal-veil" id="channel-modal">
+  <div class="modal" style="max-width:520px;">
+    <div id="channel-modal-body">Loading…</div>
+    <button class="btn btn-ghost" id="btn-close-channel-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
 <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture" id="paypal-sdk-placeholder"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 
 // ===========================================================================
@@ -612,40 +635,71 @@ el('btn-save-settings').addEventListener('click', function () {
 
 // ---- run scan ------------------------------------------------------------
 
+// ---- mode switching (single topic vs batch) -------------------------------
+
+var currentMode = 'single';
+
+function setMode(mode) {
+  currentMode = mode;
+  var singleBtn = el('mode-single-btn');
+  var batchBtn = el('mode-batch-btn');
+  if (mode === 'single') {
+    el('single-query-field').style.display = 'block';
+    el('batch-query-field').style.display = 'none';
+    singleBtn.style.background = 'var(--ink)';
+    singleBtn.style.color = '#fff';
+    batchBtn.style.background = 'transparent';
+    batchBtn.style.color = 'var(--brass-dim)';
+    el('btn-scan').textContent = 'Run niche scan';
+  } else {
+    el('single-query-field').style.display = 'none';
+    el('batch-query-field').style.display = 'block';
+    batchBtn.style.background = 'var(--ink)';
+    batchBtn.style.color = '#fff';
+    singleBtn.style.background = 'transparent';
+    singleBtn.style.color = 'var(--brass-dim)';
+    el('btn-scan').textContent = 'Run batch scan';
+  }
+}
+
+el('mode-single-btn').addEventListener('click', function () { setMode('single'); });
+el('mode-batch-btn').addEventListener('click', function () { setMode('batch'); });
+
+// Holds the {query, evidence, ai} for every dossier currently on screen, so
+// the PDF export button (clicked later, by index) can find its data again
+// without re-fetching anything.
+var SCAN_RESULTS_CACHE = [];
+
 el('btn-scan').addEventListener('click', function () {
-  var query = el('f-query').value.trim();
-  if (!query) {
-    el('scan-status').className = 'status-line status-bad';
-    el('scan-status').textContent = 'Enter a topic first.';
-    return;
+  if (currentMode === 'single') {
+    var query = el('f-query').value.trim();
+    if (!query) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Enter a topic first.';
+      return;
+    }
+    if (!lsGet('ai_key')) { openSettingsModal(); return; }
+    ensureEmail(function (email) { doScan(query, email); });
+  } else {
+    var raw = el('f-batch-queries').value;
+    var topics = raw.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; }).slice(0, 5);
+    if (topics.length === 0) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Enter at least one topic (one per line).';
+      return;
+    }
+    if (!lsGet('ai_key')) { openSettingsModal(); return; }
+    ensureEmail(function (email) { doBatchScan(topics, email); });
   }
-  if (!lsGet('ai_key')) {
-    openSettingsModal();
-    return;
-  }
-  ensureEmail(function (email) {
-    doScan(query, email);
-  });
 });
 
 function doScan(query, email) {
   var provider = lsGet('ai_provider') || 'openai';
   var apiKey = lsGet('ai_key') || '';
   var youtubeKey = lsGet('youtube_key') || '';
-  if (!apiKey) {
-    openSettingsModal();
-    return;
-  }
+  var skipCache = el('f-skip-cache').checked;
 
-  // fire-and-forget lead capture — never blocks the scan. Skipped for the
-  // owner's own testing placeholder email so it never pollutes the lead list.
-  if (email !== 'owner@nicheforge.local') {
-    fetch('/api/capture-lead', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, source: 'scan_form' })
-    }).catch(function () {});
-  }
+  maybeCaptureLead(email);
 
   var btn = el('btn-scan');
   btn.disabled = true;
@@ -662,41 +716,156 @@ function doScan(query, email) {
       aiProvider: provider,
       aiApiKey: apiKey,
       youtubeApiKey: youtubeKey,
+      skipCache: skipCache,
       licenseKey: lsGet('license_key') || ''
     })
   })
-    .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
-    .then(function (result) {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
       btn.disabled = false;
-      btn.textContent = 'Run niche scan';
-      if (!result.data.success) {
+      setMode(currentMode);
+      if (!data.success) {
         el('scan-status').className = 'status-line status-bad';
-        var msg = result.data.error ? result.data.error.message : 'Something went wrong.';
-        var next = result.data.error && result.data.error.whatToDoNext ? ' ' + result.data.error.whatToDoNext : '';
+        var msg = data.error ? data.error.message : 'Something went wrong.';
+        var next = data.error && data.error.whatToDoNext ? ' ' + data.error.whatToDoNext : '';
         el('scan-status').textContent = msg + next;
         return;
       }
       el('scan-status').textContent = '';
-      renderResults(result.data);
+      renderSingleResult(data);
     })
     .catch(function (e) {
       btn.disabled = false;
-      btn.textContent = 'Run niche scan';
+      setMode(currentMode);
       el('scan-status').className = 'status-line status-bad';
       el('scan-status').textContent = 'Network error: ' + e.message;
     });
 }
 
+function doBatchScan(topics, email) {
+  var provider = lsGet('ai_provider') || 'openai';
+  var apiKey = lsGet('ai_key') || '';
+  var youtubeKey = lsGet('youtube_key') || '';
+  var skipCache = el('f-skip-cache').checked;
+
+  maybeCaptureLead(email);
+
+  var btn = el('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Scanning ' + topics.length + ' topics…';
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = '';
+
+  fetch('/api/batch-scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      queries: topics,
+      email: email,
+      aiProvider: provider,
+      aiApiKey: apiKey,
+      youtubeApiKey: youtubeKey,
+      skipCache: skipCache,
+      licenseKey: lsGet('license_key') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      btn.disabled = false;
+      setMode(currentMode);
+      if (!data.success) {
+        el('scan-status').className = 'status-line status-bad';
+        var msg = data.error ? data.error.message : 'Something went wrong.';
+        var next = data.error && data.error.whatToDoNext ? ' ' + data.error.whatToDoNext : '';
+        el('scan-status').textContent = msg + next;
+        return;
+      }
+      el('scan-status').textContent = '';
+      renderBatchResults(data);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      setMode(currentMode);
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Network error: ' + e.message;
+    });
+}
+
+function maybeCaptureLead(email) {
+  // fire-and-forget lead capture — never blocks the scan. Skipped for the
+  // owner's own testing placeholder email so it never pollutes the lead list.
+  if (email === 'owner@nicheforge.local') return;
+  fetch('/api/capture-lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, source: 'scan_form' })
+  }).catch(function () {});
+}
+
 // ---- render results --------------------------------------------------
 
-function renderResults(data) {
-  var ev = data.evidence;
-  var ai = data.ai;
-  var html = '';
+function scansRemainingNote(meta) {
+  if (meta && !meta.unlimited && meta.scansRemaining !== null) {
+    return '<div class="muted-hi" style="font-size:13px;margin-top:14px;">' + meta.scansRemaining + ' free scan(s) remaining on this email. <a href="#pricing" style="color:#D9A441;">Upgrade for unlimited</a>.</div>';
+  }
+  return '';
+}
 
+function renderSingleResult(data) {
+  SCAN_RESULTS_CACHE = [{ query: data.query, evidence: data.evidence, ai: data.ai }];
+  var html = buildDossierHtml(data.query, data.evidence, data.ai, 0);
+  html += scansRemainingNote(data.meta);
+  showResults(html);
+}
+
+function renderBatchResults(data) {
+  SCAN_RESULTS_CACHE = [];
+  var successes = data.results.filter(function (r) { return r.success; });
+  successes.sort(function (a, b) { return b.evidence.opportunityScore - a.evidence.opportunityScore; });
+
+  var html = '';
+  if (successes.length > 0) {
+    html += '<div class="dossier" style="margin-bottom:20px;"><div class="dossier-body">';
+    html += '<h4 style="margin-bottom:10px;">Batch summary \u2014 ' + data.meta.succeeded + ' of ' + data.meta.requested + ' topics scanned</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
+    html += '<tr style="border-bottom:1px solid var(--line-paper);text-align:left;"><th style="padding:6px 4px;">Topic</th><th style="padding:6px 4px;">Score</th><th style="padding:6px 4px;">Avg views</th><th style="padding:6px 4px;">100k+ channels</th></tr>';
+    for (var s = 0; s < successes.length; s++) {
+      var r = successes[s];
+      html += '<tr style="border-bottom:1px solid var(--line-paper);"><td style="padding:6px 4px;">' + escapeHtml(r.query) + '</td><td style="padding:6px 4px;">' + r.evidence.opportunityScore + '</td><td style="padding:6px 4px;">' + r.evidence.avgViews.toLocaleString() + '</td><td style="padding:6px 4px;">' + (r.evidence.bigChannelRatio === null ? 'unknown' : Math.round(r.evidence.bigChannelRatio * 100) + '%') + '</td></tr>';
+    }
+    html += '</table></div></div>';
+  }
+
+  var failures = data.results.filter(function (r) { return !r.success; });
+  if (failures.length > 0) {
+    html += '<div class="muted-hi" style="font-size:13px;margin-bottom:16px;">';
+    for (var f = 0; f < failures.length; f++) {
+      html += '&#9888; "' + escapeHtml(failures[f].query) + '": ' + escapeHtml(failures[f].error.message) + '<br/>';
+    }
+    html += '</div>';
+  }
+
+  for (var i = 0; i < successes.length; i++) {
+    SCAN_RESULTS_CACHE.push({ query: successes[i].query, evidence: successes[i].evidence, ai: successes[i].ai });
+    html += '<div style="margin-bottom:20px;">' + buildDossierHtml(successes[i].query, successes[i].evidence, successes[i].ai, i) + '</div>';
+  }
+
+  html += scansRemainingNote(data.meta);
+  showResults(html);
+}
+
+function showResults(html) {
+  var wrap = el('results-wrap');
+  wrap.innerHTML = html;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function buildDossierHtml(query, ev, ai, idx) {
+  var html = '';
   html += '<div class="dossier">';
   html += '  <div class="dossier-head">';
-  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(data.query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; ' + (ev.youtubeKeySource === 'settings' ? 'using your own YouTube key' : "using the app's shared YouTube key") + '</div></div>';
+  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; ' + (ev.youtubeKeySource === 'settings' ? 'using your own YouTube key' : "using the app's shared YouTube key") + (ev.fromCache ? ' &middot; cached result' : '') + '</div></div>';
   html += '    <div style="text-align:right;"><div class="score">' + ev.opportunityScore + '</div><div class="muted-lo" style="font-size:12px;">Opportunity Score</div></div>';
   html += '  </div>';
   html += '  <div class="dossier-body">';
@@ -706,6 +875,17 @@ function renderResults(data) {
   html += evCell('100k+ sub channels', ev.bigChannelRatio === null ? 'unknown' : Math.round(ev.bigChannelRatio * 100) + '%');
   html += evCell('Uploads / week', ev.uploadsPerWeekInSample);
   html += '    </div>';
+
+  html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Top channels in this sample</b> (click one for a competitor breakdown):</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">';
+  var seenChannels = {};
+  for (var tv = 0; tv < ev.topVideos.length; tv++) {
+    var v = ev.topVideos[tv];
+    if (seenChannels[v.channelId]) continue;
+    seenChannels[v.channelId] = true;
+    html += '<span class="tichip channel-link" data-channel-id="' + escapeHtml(v.channelId) + '" data-channel-title="' + escapeHtml(v.channelTitle) + '">' + escapeHtml(v.channelTitle) + '</span>';
+  }
+  html += '</div>';
 
   if (ev.breakoutVideos && ev.breakoutVideos.length) {
     html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Breakout videos found</b> (beat their channel\u2019s sampled average by 2x+):</div>';
@@ -734,35 +914,140 @@ function renderResults(data) {
     html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '</div>';
   }
 
+  html += '<button class="btn btn-ghost btn-export-pdf" data-idx="' + idx + '" type="button" style="margin-top:16px;">Export PDF</button>';
+
   html += '  </div>';
   html += '</div>';
-
-  if (data.meta && !data.meta.unlimited && data.meta.scansRemaining !== null) {
-    html += '<div class="muted-hi" style="font-size:13px;margin-top:14px;">' + data.meta.scansRemaining + ' free scan(s) remaining on this email. <a href="#pricing" style="color:#D9A441;">Upgrade for unlimited</a>.</div>';
-  }
-
-  var wrap = el('results-wrap');
-  wrap.innerHTML = html;
-  wrap.style.display = 'block';
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  var chips = wrap.querySelectorAll('.tichip');
-  for (var c = 0; c < chips.length; c++) {
-    chips[c].addEventListener('click', function () {
-      var text = this.getAttribute('data-copy');
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text);
-        var original = this.textContent;
-        this.textContent = 'Copied!';
-        var self = this;
-        setTimeout(function () { self.textContent = original; }, 1200);
-      }
-    });
-  }
+  return html;
 }
 
 function evCell(label, value) {
   return '<div class="evcell"><div class="k">' + escapeHtml(label) + '</div><div class="v">' + escapeHtml(String(value)) + '</div></div>';
+}
+
+// ---- delegated events for copy chips, channel links, PDF export ----------
+
+el('results-wrap').addEventListener('click', function (e) {
+  var target = e.target;
+
+  if (target.classList.contains('channel-link')) {
+    openChannelBreakdown(target.getAttribute('data-channel-id'), target.getAttribute('data-channel-title'));
+    return;
+  }
+
+  if (target.classList.contains('btn-export-pdf')) {
+    var idx = parseInt(target.getAttribute('data-idx'), 10);
+    exportDossierToPdf(SCAN_RESULTS_CACHE[idx]);
+    return;
+  }
+
+  if (target.classList.contains('tichip') && !target.classList.contains('channel-link')) {
+    var text = target.getAttribute('data-copy');
+    if (text && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      var original = target.textContent;
+      target.textContent = 'Copied!';
+      setTimeout(function () { target.textContent = original; }, 1200);
+    }
+  }
+});
+
+// ---- competitor channel breakdown -----------------------------------------
+
+function openChannelBreakdown(channelId, channelTitle) {
+  el('channel-modal-body').innerHTML = '<h3>' + escapeHtml(channelTitle) + '</h3><p class="muted-lo">Loading real channel data…</p>';
+  el('channel-modal').className = 'modal-veil open';
+
+  fetch('/api/channel-breakdown', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channelId: channelId, youtubeApiKey: lsGet('youtube_key') || '' })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('channel-modal-body').innerHTML = '<h3>' + escapeHtml(channelTitle) + '</h3><p class="status-bad">' + escapeHtml(data.error ? data.error.message : 'Could not load this channel.') + '</p>';
+        return;
+      }
+      var c = data.channel;
+      var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(c.title) + '</h3>';
+      html += '<div class="muted-lo" style="font-size:13px;margin-bottom:16px;">' + escapeHtml(c.dataSource) + '</div>';
+      html += '<div class="evrow" style="margin-bottom:16px;">';
+      html += evCell('Subscribers', c.subscriberCount === null ? 'hidden' : c.subscriberCount.toLocaleString());
+      html += evCell('Total videos', c.totalVideoCount.toLocaleString());
+      html += evCell('Uploads / week (recent)', c.uploadsPerWeekRecent === null ? 'n/a' : c.uploadsPerWeekRecent);
+      html += evCell('Shorts share (recent)', c.shortsShareRecent === null ? 'n/a' : Math.round(c.shortsShareRecent * 100) + '%');
+      html += '</div>';
+      if (c.topVideosInSample && c.topVideosInSample.length) {
+        html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Top videos in its ' + c.sampledRecentUploads + ' most recent uploads:</b></div>';
+        html += '<ul style="margin:0;padding-left:18px;font-size:13.5px;">';
+        for (var i = 0; i < c.topVideosInSample.length; i++) {
+          html += '<li>' + escapeHtml(c.topVideosInSample[i].title) + ' \u2014 ' + c.topVideosInSample[i].views.toLocaleString() + ' views</li>';
+        }
+        html += '</ul>';
+      }
+      el('channel-modal-body').innerHTML = html;
+    })
+    .catch(function (e) {
+      el('channel-modal-body').innerHTML = '<h3>' + escapeHtml(channelTitle) + '</h3><p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('btn-close-channel-modal').addEventListener('click', function () {
+  el('channel-modal').className = 'modal-veil';
+});
+
+// ---- PDF export (client-side, jsPDF) --------------------------------------
+
+function exportDossierToPdf(result) {
+  if (!result) return;
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFCtor) {
+    alert('PDF library did not load. Check your internet connection and try again.');
+    return;
+  }
+  var ev = result.evidence;
+  var ai = result.ai;
+  var doc = new jsPDFCtor({ unit: 'pt', format: 'letter' });
+  var margin = 48;
+  var y = margin;
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var maxWidth = pageWidth - margin * 2;
+
+  function addLine(text, size, style, gap) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style || 'normal');
+    var lines = doc.splitTextToSize(text, maxWidth);
+    for (var i = 0; i < lines.length; i++) {
+      if (y > 740) { doc.addPage(); y = margin; }
+      doc.text(lines[i], margin, y);
+      y += size * 1.3;
+    }
+    y += gap || 4;
+  }
+
+  addLine('NicheForge AI \u2014 ' + result.query, 18, 'bold', 6);
+  addLine('Opportunity Score: ' + ev.opportunityScore + ' / 100', 12, 'bold', 10);
+
+  addLine('Real YouTube data (' + ev.videoCount + ' videos, last 12 months):', 12, 'bold', 2);
+  addLine('Avg views: ' + ev.avgViews.toLocaleString() + '   Median views: ' + ev.medianViews.toLocaleString(), 10, 'normal', 2);
+  addLine('Channels with 100k+ subs: ' + (ev.bigChannelRatio === null ? 'unknown' : Math.round(ev.bigChannelRatio * 100) + '%') + '   Uploads/week: ' + ev.uploadsPerWeekInSample, 10, 'normal', 10);
+  addLine('Score formula: ' + ev.scoreFormula, 8, 'italic', 14);
+
+  addLine('AI-synthesized opportunities (interpretation of the real data above):', 12, 'bold', 8);
+  for (var i = 0; i < ai.opportunities.length; i++) {
+    var o = ai.opportunities[i];
+    addLine((i + 1) + '. ' + o.angle, 11, 'bold', 2);
+    addLine(o.rationale, 10, 'normal', 2);
+    addLine('Title ideas: ' + o.titleIdeas.join('  |  '), 9, 'italic', 10);
+  }
+  if (ai.contentGap) {
+    addLine('Content gap: ' + ai.contentGap, 10, 'bold', 4);
+  }
+
+  addLine('Generated by NicheForge AI on ' + new Date().toLocaleDateString(), 8, 'italic', 0);
+
+  doc.save('nicheforge-' + result.query.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) + '.pdf');
 }
 
 // ---- license activation --------------------------------------------------

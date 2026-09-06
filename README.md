@@ -76,6 +76,29 @@ without touching Netlify's dashboard, and later lets any buyer optionally
 supply their own quota). Every scan result now labels which key served it
 ("using your own YouTube key" vs "using the app's shared YouTube key").
 
+## v1.2 — batch mode, competitor breakdown, caching, PDF export
+
+No tiers, no gating — every feature below is available to anyone with an AI
+key configured (this is a single program, not a tiered product):
+
+- **Scan result caching** — real YouTube evidence is cached per topic for 24
+  hours in Blobs (`nforge-scan-cache`). A "Force fresh data" checkbox next
+  to the scan button bypasses it when you want a live pull instead.
+- **Batch mode** — a "Batch (up to 5)" tab lets you scan up to 5 topics in
+  one request (`netlify/functions/batch-scan.js`). Results show a sorted
+  comparison table plus each topic's full dossier below it. One topic
+  failing (no results, quota, etc.) never kills the rest of the batch.
+- **Competitor channel breakdown** — click any channel name in a scan's
+  results to open a real-data-only panel (`netlify/functions/channel-breakdown.js`):
+  subscriber count, upload frequency, Shorts/long-form split, and top 5
+  videos from its most recent uploads. No AI call, no BYOK key required.
+- **PDF export** — every dossier has an "Export PDF" button that builds a
+  clean report client-side via jsPDF (loaded from cdnjs) — no server-side
+  rendering, no extra function.
+- The single-scan and batch-scan endpoints now share one engine
+  (`netlify/functions/_shared/scan-core.js`) instead of duplicating the
+  YouTube-fetching and AI-synthesis logic.
+
 ## Privacy
 
 - The buyer's AI API key **and** any personal YouTube key entered in Settings
@@ -98,6 +121,11 @@ supply their own quota). Every scan result now labels which key served it
 - [ ] Admin panel with wrong admin key → 401, no data shown
 - [ ] Admin panel "Generate keys" → keys downloadable as CSV and stored in Blobs
 - [ ] Admin panel "Export leads" / "Export licenses" → correct CSV contents
+- [ ] Same topic scanned twice within 24h → second run shows "cached result", no extra YouTube quota used
+- [ ] "Force fresh data" checked → cache is bypassed, `fromCache` is false
+- [ ] Batch of 5 topics, one deliberately nonsense → 4 succeed, 1 shows a per-topic error, batch still completes
+- [ ] Click a channel name in results → breakdown panel shows real subscriber/upload/Shorts data
+- [ ] "Export PDF" on a dossier → downloads a readable PDF with the same real numbers and AI opportunities shown on screen
 
 ## Deploying
 
