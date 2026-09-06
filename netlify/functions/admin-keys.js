@@ -62,7 +62,7 @@ exports.handler = async function (event) {
 
     let licensesStore;
     try {
-      licensesStore = getStore('nforge-licenses', { consistency: 'strong' });
+      licensesStore = getStore({ name: 'nforge-licenses', consistency: 'strong' });
     } catch (e) {
       return http.fail(500, 'storage_unavailable', 'Netlify Blobs is not available: ' + e.message);
     }
@@ -91,7 +91,7 @@ exports.handler = async function (event) {
 
   if (action === 'export_leads') {
     try {
-      const leadsStore = getStore('nforge-leads', { consistency: 'strong' });
+      const leadsStore = getStore({ name: 'nforge-leads', consistency: 'strong' });
       const list = await leadsStore.list();
       const rows = [];
       for (const item of list.blobs) {
@@ -106,7 +106,7 @@ exports.handler = async function (event) {
 
   if (action === 'export_licenses') {
     try {
-      const licensesStore = getStore('nforge-licenses', { consistency: 'strong' });
+      const licensesStore = getStore({ name: 'nforge-licenses', consistency: 'strong' });
       const list = await licensesStore.list();
       const rows = [];
       for (const item of list.blobs) {
