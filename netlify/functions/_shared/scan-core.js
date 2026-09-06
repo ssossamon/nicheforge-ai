@@ -545,6 +545,7 @@ async function saveToHistory(email, query, evidence, ai, contentType) {
       evidence.opportunityScore !== undefined ? evidence.opportunityScore :
       evidence.videoPerformanceScore !== undefined ? evidence.videoPerformanceScore :
       evidence.channelHealthScore !== undefined ? evidence.channelHealthScore :
+      evidence.competitivePositionScore !== undefined ? evidence.competitivePositionScore :
       (ai && ai.scriptQualityScore !== undefined) ? ai.scriptQualityScore : null;
     await store.setJSON(id, {
       id: id,

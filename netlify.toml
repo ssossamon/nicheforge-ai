@@ -8,6 +8,9 @@
 [functions."watchlist-recheck"]
   schedule = "@daily"
 
+[functions."competitor-recheck"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

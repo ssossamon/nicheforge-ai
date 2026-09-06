@@ -113,6 +113,44 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v1.7 — Competitor Analysis + Transcript Playbook, merged natively
+
+Two modules originally built as a separate app (RivalPulse AI, which stays
+live as its own product) are now native NicheForge features — same license
+system, same 3-free-scans quota, same navy/paper/brass dossier UI, same
+History/Reports integration, not a bolted-on second product.
+
+**Competitor Analysis** (new mode tab, alongside Single/Batch/Analyze URL):
+enter your business + up to 5 named competitors, RivalPulse-style real page
+fetching grounds per-competitor positioning/pricing, and the AI produces
+the full TranscriptIQ-depth report — SWOT, position score breakdown, market
+trends, TAM, go-to-market strategy, niche/keyword analysis, prioritized
+recommendations, pricing intelligence. Saved as a trackable "watch"
+(`nforge-competitor-watches`) and checked daily for real page changes
+(`competitor-recheck.js`, scheduled) — alerts (`nforge-competitor-alerts`)
+store real before/after text, with the AI summary generated on-demand
+(the scheduled job has no BYOK key to call an AI with, so it only does
+free, factual content-hash diffing; summarizing what changed happens live
+in the browser using the user's own key). Reachable via the new
+"Competitors" nav link (Tracked/Alerts tabs).
+
+**Transcript Playbook** (new mode tab): paste a YouTube URL (reuses the
+existing `content-analysis.js` real transcript fetch — no new fetching
+logic) or a transcript directly, and get three things: the specific
+tactics actually evidenced in the transcript ("how did they do that"), the
+generalized transferable mechanic separated from their specific brand/copy
+("how can you do that" — same mechanic-vs-proprietary-asset discipline as
+the tool-upgrade-prompt-builder skill), and a numbered, executable SOP with
+time estimates, success metrics, and pitfalls. Saved playbooks
+(`nforge-playbooks`) are reachable via the new "Playbooks" nav link and
+copyable as plain text for handing to a team.
+
+Both modules feed the existing History/Reports system: `scan-core.js`'s
+`saveToHistory` now recognizes `competitivePositionScore`, and `reports.js`
+correctly labels competitor items (not mislabeled as "Opportunity Score")
+and folds real competitor names into the Reports competitive-landscape
+section alongside niche-scan-derived channels.
+
 ## v1.6 — reports go beyond hooks: calendar, outlines, competitive landscape
 
 The Reports module now produces a genuine two-tier deliverable instead of a

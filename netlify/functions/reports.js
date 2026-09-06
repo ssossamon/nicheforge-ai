@@ -317,6 +317,12 @@ function buildCompetitiveLandscape(items) {
       record(ev.id || ev.title, ev.title, rec.query);
     } else if (rec.contentType === 'video' && ev.channelTitle) {
       record(ev.channelId || ev.channelTitle, ev.channelTitle, rec.query);
+    } else if (rec.contentType === 'competitor' && ev.competitorPages) {
+      // real, named competitors the user entered and RivalPulse-style
+      // analysis actually fetched — not inferred from search results
+      ev.competitorPages.forEach(function (cp) {
+        record(cp.url || cp.name, cp.name, rec.query);
+      });
     } else if (ev.topVideos) {
       // niche scans carry a real list of channels behind the top videos
       ev.topVideos.forEach(function (v) {
@@ -386,8 +392,9 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
       const scoreLabel =
         rec.contentType === 'video' ? 'Video Performance Score' :
         rec.contentType === 'channel' ? 'Channel Health Score' :
-        rec.contentType === 'transcript' ? 'Script Quality Score (AI estimate)' : 'Opportunity Score';
-      const gap = rec.ai && rec.ai.contentGap ? rec.ai.contentGap : (rec.ai && rec.ai.hookAssessment ? rec.ai.hookAssessment : null);
+        rec.contentType === 'transcript' ? 'Script Quality Score (AI estimate)' :
+        rec.contentType === 'competitor' ? 'Competitive Position Score' : 'Opportunity Score';
+      const gap = rec.ai && rec.ai.contentGap ? rec.ai.contentGap : (rec.ai && rec.ai.hookAssessment ? rec.ai.hookAssessment : (rec.ai && rec.ai.verdict ? rec.ai.verdict : null));
       return (
         (i + 1) + '. [' + (rec.contentType || 'niche') + '] "' + rec.query + '" \u2014 ' + scoreLabel + ': ' + rec.score +
         (rec.avgViews ? ', avg/real views: ' + rec.avgViews : '') +

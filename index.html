@@ -194,6 +194,8 @@
       <a href="javascript:void(0)" id="nav-history-link">History</a>
       <a href="javascript:void(0)" id="nav-watchlist-link">Watchlist</a>
       <a href="javascript:void(0)" id="nav-reports-link">Reports</a>
+      <a href="javascript:void(0)" id="nav-competitors-link">Competitors</a>
+      <a href="javascript:void(0)" id="nav-playbooks-link">Playbooks</a>
     </div>
     <a class="navcta" href="#scan">Run a free scan</a>
   </div>
@@ -216,10 +218,12 @@
       <h3>Run a niche scan</h3>
       <div class="h3sub">Takes about 15 seconds per topic.</div>
 
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <button class="btn btn-ghost" id="mode-single-btn" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;">Single topic</button>
-        <button class="btn btn-ghost" id="mode-batch-btn" type="button" style="flex:1;font-size:13px;">Batch (up to 5)</button>
-        <button class="btn btn-ghost" id="mode-analyze-btn" type="button" style="flex:1;font-size:13px;">Analyze URL</button>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="mode-single-btn" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;min-width:110px;">Single topic</button>
+        <button class="btn btn-ghost" id="mode-batch-btn" type="button" style="flex:1;font-size:13px;min-width:110px;">Batch (up to 5)</button>
+        <button class="btn btn-ghost" id="mode-analyze-btn" type="button" style="flex:1;font-size:13px;min-width:110px;">Analyze URL</button>
+        <button class="btn btn-ghost" id="mode-competitor-btn" type="button" style="flex:1;font-size:13px;min-width:110px;">Competitor Analysis</button>
+        <button class="btn btn-ghost" id="mode-playbook-btn" type="button" style="flex:1;font-size:13px;min-width:110px;">Transcript Playbook</button>
       </div>
 
       <div class="field" id="single-query-field">
@@ -236,6 +240,33 @@
         <label for="f-analyze-input">Video URL, Shorts URL, channel URL/@handle, or pasted transcript</label>
         <textarea id="f-analyze-input" rows="5" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="https://youtube.com/watch?v=... or https://youtube.com/@handle or paste a transcript/script"></textarea>
         <div class="helper">Auto-detects which of the three it is — no need to pick a type.</div>
+      </div>
+
+      <div id="competitor-query-field" style="display:none;">
+        <div class="field">
+          <label for="f-comp-biz-name">Your business name</label>
+          <input type="text" id="f-comp-biz-name" placeholder="e.g. Coastal Kitchen Supply Co." />
+        </div>
+        <div class="field">
+          <label for="f-comp-biz-desc">What you do (1-2 sentences)</label>
+          <textarea id="f-comp-biz-desc" rows="2" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="e.g. We sell direct-to-consumer commercial-grade kitchen tools for home cooks."></textarea>
+        </div>
+        <div class="field">
+          <label>Competitors (name + URL, up to 5)</label>
+          <div id="competitor-rows"></div>
+          <button class="btn btn-ghost" id="btn-add-competitor" type="button" style="font-size:12.5px;padding:6px 12px;margin-top:4px;">+ Add another competitor</button>
+        </div>
+        <div class="field">
+          <label for="f-comp-watch-name">Name this tracking set (optional)</label>
+          <input type="text" id="f-comp-watch-name" placeholder="e.g. Q3 kitchenware competitors" />
+          <div class="helper">Saved so we can check these same pages for real changes going forward.</div>
+        </div>
+      </div>
+
+      <div class="field" id="playbook-query-field" style="display:none;">
+        <label for="f-transcript-input">YouTube URL or pasted transcript</label>
+        <textarea id="f-transcript-input" rows="6" style="width:100%;padding:11px 12px;border:1px solid var(--line-paper);border-radius:3px;font-size:14px;font-family:inherit;" placeholder="https://youtube.com/watch?v=... or paste a transcript"></textarea>
+        <div class="helper">Answers: how did they do that, how can you do that, and the exact steps to do it yourself.</div>
       </div>
 
       <div class="field">
@@ -539,6 +570,47 @@
   </div>
 </div>
 
+<div class="modal-veil" id="competitors-modal">
+  <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto;">
+    <h3>Competitor tracking</h3>
+    <p class="muted-lo" style="font-size:13px;">Checked once a day for real page changes — pricing, messaging, anything that actually changed.</p>
+    <div style="display:flex;gap:8px;margin:14px 0;">
+      <button class="btn btn-ghost" id="competitors-tab-tracked" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;">Tracked</button>
+      <button class="btn btn-ghost" id="competitors-tab-alerts" type="button" style="flex:1;font-size:13px;">Alerts <span id="alert-count-badge"></span></button>
+    </div>
+    <div id="competitors-tracked-view"><div id="tracked-list"><p class="muted-lo">Loading…</p></div></div>
+    <div id="competitors-alerts-view" style="display:none;"><div id="alerts-list"><p class="muted-lo">Loading…</p></div></div>
+    <button class="btn btn-ghost" id="btn-close-competitors-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="explain-change-modal">
+  <div class="modal">
+    <div id="explain-change-body">Loading…</div>
+    <button class="btn btn-ghost" id="btn-close-explain-change-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="playbooks-modal">
+  <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto;">
+    <h3>Saved playbooks</h3>
+    <p class="muted-lo" style="font-size:13px;">Reopen a playbook you've already built from a transcript.</p>
+    <div id="playbooks-list" style="margin-top:14px;"><p class="muted-lo">Loading…</p></div>
+    <button class="btn btn-ghost" id="btn-close-playbooks-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="playbook-view-modal">
+  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
+    <div id="playbook-view-body">Loading…</div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-ghost" id="btn-copy-playbook" type="button">Copy as text</button>
+      <button class="btn btn-ghost" id="btn-close-playbook-view-modal" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+
 <div class="modal-veil" id="outline-modal">
   <div class="modal" style="max-width:560px;">
     <div id="outline-modal-body">Loading…</div>
@@ -721,11 +793,15 @@ function setMode(mode) {
   var singleBtn = el('mode-single-btn');
   var batchBtn = el('mode-batch-btn');
   var analyzeBtn = el('mode-analyze-btn');
-  var allBtns = [singleBtn, batchBtn, analyzeBtn];
+  var competitorBtn = el('mode-competitor-btn');
+  var playbookBtn = el('mode-playbook-btn');
+  var allBtns = [singleBtn, batchBtn, analyzeBtn, competitorBtn, playbookBtn];
   allBtns.forEach(function (b) { b.style.background = 'transparent'; b.style.color = 'var(--brass-dim)'; });
   el('single-query-field').style.display = 'none';
   el('batch-query-field').style.display = 'none';
   el('analyze-query-field').style.display = 'none';
+  el('competitor-query-field').style.display = 'none';
+  el('playbook-query-field').style.display = 'none';
 
   if (mode === 'single') {
     el('single-query-field').style.display = 'block';
@@ -737,17 +813,47 @@ function setMode(mode) {
     batchBtn.style.background = 'var(--ink)';
     batchBtn.style.color = '#fff';
     el('btn-scan').textContent = 'Run batch scan';
-  } else {
+  } else if (mode === 'analyze') {
     el('analyze-query-field').style.display = 'block';
     analyzeBtn.style.background = 'var(--ink)';
     analyzeBtn.style.color = '#fff';
     el('btn-scan').textContent = 'Analyze';
+  } else if (mode === 'competitor') {
+    el('competitor-query-field').style.display = 'block';
+    competitorBtn.style.background = 'var(--ink)';
+    competitorBtn.style.color = '#fff';
+    el('btn-scan').textContent = 'Run competitor analysis';
+    if (el('competitor-rows').children.length === 0) {
+      addCompetitorRow();
+      addCompetitorRow();
+    }
+  } else {
+    el('playbook-query-field').style.display = 'block';
+    playbookBtn.style.background = 'var(--ink)';
+    playbookBtn.style.color = '#fff';
+    el('btn-scan').textContent = 'Dissect & build playbook';
   }
 }
 
 el('mode-single-btn').addEventListener('click', function () { setMode('single'); });
 el('mode-batch-btn').addEventListener('click', function () { setMode('batch'); });
 el('mode-analyze-btn').addEventListener('click', function () { setMode('analyze'); });
+el('mode-competitor-btn').addEventListener('click', function () { setMode('competitor'); });
+el('mode-playbook-btn').addEventListener('click', function () { setMode('playbook'); });
+
+// ---- competitor input rows ---------------------------------------------
+function addCompetitorRow(name, url) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
+  wrap.innerHTML =
+    '<input type="text" class="comp-name" placeholder="Competitor name" style="flex:1;padding:9px 11px;border:1px solid var(--line-paper);border-radius:3px;font-size:13.5px;" value="' + escapeHtml(name || '') + '" />' +
+    '<input type="url" class="comp-url" placeholder="https://competitor.com" style="flex:1;padding:9px 11px;border:1px solid var(--line-paper);border-radius:3px;font-size:13.5px;" value="' + escapeHtml(url || '') + '" />' +
+    '<span class="remove-comp-row" style="cursor:pointer;color:var(--muted-lo);font-size:18px;padding:0 4px;">\u00D7</span>';
+  wrap.querySelector('.remove-comp-row').addEventListener('click', function () { wrap.remove(); });
+  el('competitor-rows').appendChild(wrap);
+}
+
+el('btn-add-competitor').addEventListener('click', function () { addCompetitorRow(); });
 
 // Holds the {query, evidence, ai} for every dossier currently on screen, so
 // the PDF export button (clicked later, by index) can find its data again
@@ -774,7 +880,7 @@ el('btn-scan').addEventListener('click', function () {
     }
     if (!lsGet('ai_key')) { openSettingsModal(); return; }
     ensureEmail(function (email) { doBatchScan(topics, email); });
-  } else {
+  } else if (currentMode === 'analyze') {
     var analyzeInput = el('f-analyze-input').value.trim();
     if (!analyzeInput) {
       el('scan-status').className = 'status-line status-bad';
@@ -783,6 +889,37 @@ el('btn-scan').addEventListener('click', function () {
     }
     if (!lsGet('ai_key')) { openSettingsModal(); return; }
     ensureEmail(function (email) { doAnalyze(analyzeInput, email); });
+  } else if (currentMode === 'competitor') {
+    var bizName = el('f-comp-biz-name').value.trim();
+    var bizDesc = el('f-comp-biz-desc').value.trim();
+    var compRows = document.querySelectorAll('#competitor-rows > div');
+    var competitors = [];
+    for (var cr = 0; cr < compRows.length; cr++) {
+      var cname = compRows[cr].querySelector('.comp-name').value.trim();
+      var curl = compRows[cr].querySelector('.comp-url').value.trim();
+      if (cname && curl) competitors.push({ name: cname, url: curl });
+    }
+    if (!bizName || !bizDesc) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Enter your business name and description.';
+      return;
+    }
+    if (competitors.length === 0) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Add at least one competitor with both a name and URL.';
+      return;
+    }
+    if (!lsGet('ai_key')) { openSettingsModal(); return; }
+    ensureEmail(function (email) { doCompetitorAnalysis(bizName, bizDesc, competitors, el('f-comp-watch-name').value.trim(), email); });
+  } else {
+    var transcriptInput = el('f-transcript-input').value.trim();
+    if (!transcriptInput) {
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Paste a YouTube URL or a transcript first.';
+      return;
+    }
+    if (!lsGet('ai_key')) { openSettingsModal(); return; }
+    ensureEmail(function (email) { doDissectTranscript(transcriptInput, email); });
   }
 });
 
@@ -932,6 +1069,100 @@ function doAnalyze(input, email) {
     });
 }
 
+function doCompetitorAnalysis(bizName, bizDesc, competitors, watchName, email) {
+  var provider = lsGet('ai_provider') || 'openai';
+  var apiKey = lsGet('ai_key') || '';
+
+  maybeCaptureLead(email);
+
+  var btn = el('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Fetching pages + analyzing…';
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = '';
+
+  fetch('/api/analyze-competitors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: email,
+      business: { name: bizName, description: bizDesc },
+      competitors: competitors,
+      watchName: watchName,
+      aiProvider: provider,
+      aiApiKey: apiKey,
+      aiModel: lsGet('ai_model') || '',
+      licenseKey: lsGet('license_key') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      btn.disabled = false;
+      setMode(currentMode);
+      if (!data.success) {
+        el('scan-status').className = 'status-line status-bad';
+        var msg = data.error ? data.error.message : 'Something went wrong.';
+        var next = data.error && data.error.whatToDoNext ? ' ' + data.error.whatToDoNext : '';
+        el('scan-status').textContent = msg + next;
+        return;
+      }
+      el('scan-status').textContent = '';
+      renderCompetitorAnalysis(data);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      setMode(currentMode);
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Network error: ' + e.message;
+    });
+}
+
+function doDissectTranscript(input, email) {
+  var provider = lsGet('ai_provider') || 'openai';
+  var apiKey = lsGet('ai_key') || '';
+
+  maybeCaptureLead(email);
+
+  var btn = el('btn-scan');
+  btn.disabled = true;
+  btn.textContent = 'Dissecting…';
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = '';
+
+  fetch('/api/dissect-transcript', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: email,
+      input: input,
+      aiProvider: provider,
+      aiApiKey: apiKey,
+      aiModel: lsGet('ai_model') || '',
+      licenseKey: lsGet('license_key') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      btn.disabled = false;
+      setMode(currentMode);
+      if (!data.success) {
+        el('scan-status').className = 'status-line status-bad';
+        var msg = data.error ? data.error.message : 'Something went wrong.';
+        var next = data.error && data.error.whatToDoNext ? ' ' + data.error.whatToDoNext : '';
+        el('scan-status').textContent = msg + next;
+        return;
+      }
+      el('scan-status').textContent = '';
+      renderPlaybookResult(data.sourceLabel, data.result, data.meta);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      setMode(currentMode);
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Network error: ' + e.message;
+    });
+}
+
 function renderVideoAnalysis(ev, ai) {
   var html = '<div class="dossier"><div class="dossier-head">';
   html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(ev.title) + '</h3><div class="muted-lo" style="font-size:13px;">' + escapeHtml(ev.channelTitle) + (ev.isShort ? ' \u00B7 Short' : '') + ' \u00B7 published ' + ev.daysSincePublished + ' days ago \u00B7 ' + (ev.transcript ? 'real transcript used' : 'no transcript available') + '</div></div>';
@@ -1025,6 +1256,183 @@ function renderTranscriptAnalysis(ev, ai) {
   html += '</div></div>';
   showResults(html);
 }
+
+function renderCompetitorAnalysis(data) {
+  var a = data.analysis;
+  var html = '<div class="dossier"><div class="dossier-head">';
+  html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(data.businessName) + ' vs. ' + data.competitorPages.length + ' competitor(s)</h3><div class="muted-lo" style="font-size:13px;">' + data.competitorPages.filter(function (p) { return p.fetched; }).length + ' of ' + data.competitorPages.length + ' pages fetched for real; broader market analysis is AI-estimated.</div></div>';
+  html += '<div style="text-align:right;"><div class="score">' + a.competitivePositionScore + '</div><div class="muted-lo" style="font-size:12px;">Position Score</div></div>';
+  html += '</div><div class="dossier-body">';
+
+  if (a.scoreBreakdown) {
+    html += '<div class="evrow">';
+    html += evCell('Differentiation', a.scoreBreakdown.differentiation + '/25');
+    html += evCell('Competitive intensity', a.scoreBreakdown.competitiveIntensity + '/25');
+    html += evCell('Market timing', a.scoreBreakdown.marketTiming + '/25');
+    html += evCell('Execution readiness', a.scoreBreakdown.executionReadiness + '/25');
+    html += '</div>';
+  }
+  if (a.verdict) html += '<div class="muted-lo" style="font-size:13.5px;margin-bottom:18px;">' + escapeHtml(a.verdict) + '</div>';
+
+  for (var i = 0; i < data.competitorPages.length; i++) {
+    var page = data.competitorPages[i];
+    var comp = (a.perCompetitor || []).filter(function (c) { return c.name === page.name; })[0];
+    html += '<div style="border:1px solid var(--line-paper);border-radius:3px;padding:14px 16px;margin-bottom:12px;">';
+    html += '<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><b style="font-size:14px;">' + escapeHtml(page.name) + '</b><span class="muted-lo" style="font-size:12px;">' + escapeHtml(page.url) + '</span></div>';
+    if (!page.fetched) html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:8px;">Page could not be fetched (' + escapeHtml(page.error) + ') \u2014 analyzed from general market knowledge instead.</div>';
+    if (comp) {
+      html += '<div style="font-size:13.5px;margin-bottom:6px;"><b>Positioning:</b> ' + escapeHtml(comp.positioning) + '</div>';
+      html += '<div style="font-size:13.5px;margin-bottom:8px;"><b>Pricing:</b> ' + escapeHtml(comp.visiblePricing) + '</div>';
+      if (comp.apparentStrengths) for (var s = 0; s < comp.apparentStrengths.length; s++) html += '<span class="tichip" style="cursor:default;background:#E9F3EC;color:var(--moss);">' + escapeHtml(comp.apparentStrengths[s]) + '</span> ';
+      if (comp.gapsOrWeaknesses) for (var g = 0; g < comp.gapsOrWeaknesses.length; g++) html += '<span class="tichip" style="cursor:default;background:#F7E9E4;color:var(--rust);">' + escapeHtml(comp.gapsOrWeaknesses[g]) + '</span> ';
+    }
+    html += '</div>';
+  }
+
+  if (a.swot) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:18px 0 8px;"><b>SWOT</b></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;font-size:13px;">';
+    html += '<div><b style="color:var(--moss);">Strengths</b><ul style="margin:4px 0 0;padding-left:16px;">' + (a.swot.strengths || []).map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    html += '<div><b style="color:var(--rust);">Weaknesses</b><ul style="margin:4px 0 0;padding-left:16px;">' + (a.swot.weaknesses || []).map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    html += '<div><b style="color:var(--brass-dim);">Opportunities</b><ul style="margin:4px 0 0;padding-left:16px;">' + (a.swot.opportunities || []).map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    html += '<div><b style="color:var(--rust);">Threats</b><ul style="margin:4px 0 0;padding-left:16px;">' + (a.swot.threats || []).map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul></div>';
+    html += '</div>';
+  }
+
+  if (a.marketTrends && a.marketTrends.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Market trends</b></div>';
+    for (var t = 0; t < a.marketTrends.length; t++) html += '<div style="font-size:13.5px;margin-bottom:6px;">' + escapeHtml(a.marketTrends[t].trend) + ' \u2014 ' + escapeHtml(a.marketTrends[t].description) + '</div>';
+  }
+
+  if (a.tamEstimate) html += '<div class="opp"><h4>Estimated market size</h4><p>' + escapeHtml(a.tamEstimate) + '</p></div>';
+
+  if (a.goToMarket && a.goToMarket.length) {
+    html += '<div class="opp"><h4>Go-to-market strategy</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
+    for (var gm = 0; gm < a.goToMarket.length; gm++) html += '<li>' + escapeHtml(a.goToMarket[gm]) + '</li>';
+    html += '</ul></div>';
+  }
+
+  if (a.nicheAnalysis && a.nicheAnalysis.targetKeywords && a.nicheAnalysis.targetKeywords.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:18px 0 6px;"><b>Target keywords</b> (estimated)</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">';
+    for (var k = 0; k < a.nicheAnalysis.targetKeywords.length; k++) {
+      html += '<span class="tichip" style="cursor:default;">' + escapeHtml(a.nicheAnalysis.targetKeywords[k].keyword) + '</span>';
+    }
+    html += '</div>';
+  }
+
+  if (a.advancedRecommendations && a.advancedRecommendations.length) {
+    html += '<div class="opp"><h4>Recommendations</h4>';
+    for (var r = 0; r < a.advancedRecommendations.length; r++) {
+      var rec = a.advancedRecommendations[r];
+      html += '<p><b>[' + escapeHtml(rec.priority) + ']</b> ' + escapeHtml(rec.title) + ' \u2014 ' + escapeHtml(rec.description) + '</p>';
+    }
+    html += '</div>';
+  }
+
+  if (a.pricingIntelligence && a.pricingIntelligence.priceAnchors && a.pricingIntelligence.priceAnchors.length) {
+    html += '<div class="gapbox"><b>Pricing intelligence:</b> ' + escapeHtml(a.pricingIntelligence.recommendedModel || '') + '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">';
+    for (var pa = 0; pa < a.pricingIntelligence.priceAnchors.length; pa++) {
+      var anchor = a.pricingIntelligence.priceAnchors[pa];
+      html += '<div style="font-size:13px;"><b>' + escapeHtml(anchor.tier) + '</b>: ' + escapeHtml(anchor.price) + '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  html += scansRemainingNote(data.meta);
+  html += '</div></div>';
+  showResults(html);
+}
+
+function renderPlaybookResult(sourceLabel, result, meta) {
+  var html = '<div class="dossier"><div class="dossier-head">';
+  html += '<div><h3 style="margin-bottom:2px;">' + escapeHtml(result.playbook ? result.playbook.title : 'Playbook') + '</h3><div class="muted-lo" style="font-size:13px;">' + escapeHtml(sourceLabel) + '</div></div>';
+  html += '</div><div class="dossier-body">';
+
+  html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>How did they do that?</b></div>';
+  for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
+    var t = result.whatTheyDid[i];
+    html += '<div class="opp"><h4>' + escapeHtml(t.tactic) + '</h4><p><b>What they did:</b> ' + escapeHtml(t.howTheyDidIt) + '</p><p style="color:var(--muted-lo);"><b>Why it works:</b> ' + escapeHtml(t.whyItWorks) + '</p></div>';
+  }
+
+  html += '<div class="gapbox"><b>How can you do that?</b> ' + escapeHtml(result.replicableMechanic) + '</div>';
+  if (result.adaptationNotes && result.adaptationNotes.length) {
+    html += '<ul style="margin:10px 0 20px;padding-left:18px;font-size:13.5px;">';
+    for (var a = 0; a < result.adaptationNotes.length; a++) html += '<li>' + escapeHtml(result.adaptationNotes[a]) + '</li>';
+    html += '</ul>';
+  }
+
+  if (result.playbook) {
+    var p = result.playbook;
+    html += '<div class="muted-lo" style="font-size:13px;margin:18px 0 8px;"><b>' + escapeHtml(p.title || 'Playbook') + '</b> \u2014 ' + escapeHtml(p.objective || '') + '</div>';
+    if (p.prerequisites && p.prerequisites.length) {
+      html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:8px;">Before you start: ' + p.prerequisites.map(escapeHtml).join('; ') + '</div>';
+    }
+    html += '<ol style="margin:0 0 16px;padding-left:20px;">';
+    for (var s = 0; s < (p.steps || []).length; s++) {
+      var step = p.steps[s];
+      html += '<li style="margin-bottom:12px;font-size:13.5px;"><b>' + escapeHtml(step.action) + '</b> <span class="muted-lo">(' + escapeHtml(step.estimatedTime) + ')</span><div style="color:var(--muted-lo);margin-top:2px;">' + escapeHtml(step.details) + '</div></li>';
+    }
+    html += '</ol>';
+    if (p.successMetrics && p.successMetrics.length) html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:6px;"><b>Success metrics:</b> ' + p.successMetrics.map(escapeHtml).join('; ') + '</div>';
+    if (p.commonPitfalls && p.commonPitfalls.length) html += '<div class="muted-lo" style="font-size:12.5px;"><b>Common pitfalls:</b> ' + p.commonPitfalls.map(escapeHtml).join('; ') + '</div>';
+  }
+
+  html += scansRemainingNote(meta);
+  html += '<div style="display:flex;gap:10px;margin-top:16px;">';
+  html += '<button class="btn btn-ghost" id="btn-copy-current-playbook" type="button">Copy as text</button>';
+  html += '</div>';
+  html += '</div></div>';
+  CURRENT_PLAYBOOK_FOR_COPY = { sourceLabel: sourceLabel, result: result };
+  showResults(html);
+  el('btn-copy-current-playbook').addEventListener('click', function () { copyPlaybookAsText(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result); });
+}
+
+function playbookToPlainText(sourceLabel, result) {
+  var lines = [];
+  lines.push('PLAYBOOK — ' + (result.playbook ? result.playbook.title : 'Untitled'));
+  lines.push('Source: ' + sourceLabel);
+  lines.push('');
+  lines.push('HOW THEY DID IT');
+  for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
+    var t = result.whatTheyDid[i];
+    lines.push('- ' + t.tactic + ': ' + t.howTheyDidIt + ' (Why it works: ' + t.whyItWorks + ')');
+  }
+  lines.push('');
+  lines.push('HOW YOU CAN DO IT');
+  lines.push(result.replicableMechanic);
+  for (var a = 0; a < (result.adaptationNotes || []).length; a++) lines.push('- ' + result.adaptationNotes[a]);
+  lines.push('');
+  if (result.playbook) {
+    var p = result.playbook;
+    lines.push('PLAYBOOK: ' + p.title);
+    lines.push(p.objective || '');
+    lines.push('');
+    for (var s = 0; s < (p.steps || []).length; s++) {
+      var step = p.steps[s];
+      lines.push(step.stepNumber + '. ' + step.action + ' (' + step.estimatedTime + ')');
+      lines.push('   ' + step.details);
+    }
+    lines.push('');
+    lines.push('Success metrics: ' + (p.successMetrics || []).join('; '));
+    lines.push('Common pitfalls: ' + (p.commonPitfalls || []).join('; '));
+  }
+  return lines.join('\n');
+}
+
+function copyPlaybookAsText(sourceLabel, result) {
+  var text = playbookToPlainText(sourceLabel, result);
+  navigator.clipboard.writeText(text).then(function () {
+    var btn = el('btn-copy-current-playbook') || el('btn-copy-playbook');
+    if (btn) {
+      var original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function () { btn.textContent = original; }, 1500);
+    }
+  });
+}
+
+var CURRENT_PLAYBOOK_FOR_COPY = null;
 
 function maybeCaptureLead(email) {
   // fire-and-forget lead capture — never blocks the scan. Skipped for the
@@ -1749,6 +2157,7 @@ function contentTypeLabel(t) {
   if (t === 'video') return 'Video';
   if (t === 'channel') return 'Channel';
   if (t === 'transcript') return 'Script';
+  if (t === 'competitor') return 'Competitor';
   return 'Niche';
 }
 
@@ -2153,6 +2562,283 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   addLine('Generated by NicheForge AI', 8, 'italic', 0);
 
   doc.save('nicheforge-report-' + report.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) + '.pdf');
+});
+
+// ---- Competitors modal (Tracked / Alerts tabs) --------------------------
+
+el('nav-competitors-link').addEventListener('click', function () {
+  el('competitors-modal').className = 'modal-veil open';
+  showCompetitorsTab('tracked');
+});
+el('btn-close-competitors-modal').addEventListener('click', function () {
+  el('competitors-modal').className = 'modal-veil';
+});
+el('competitors-tab-tracked').addEventListener('click', function () { showCompetitorsTab('tracked'); });
+el('competitors-tab-alerts').addEventListener('click', function () { showCompetitorsTab('alerts'); });
+
+function showCompetitorsTab(tab) {
+  var trackedBtn = el('competitors-tab-tracked');
+  var alertsBtn = el('competitors-tab-alerts');
+  if (tab === 'tracked') {
+    el('competitors-tracked-view').style.display = 'block';
+    el('competitors-alerts-view').style.display = 'none';
+    trackedBtn.style.background = 'var(--ink)';
+    trackedBtn.style.color = '#fff';
+    alertsBtn.style.background = 'transparent';
+    alertsBtn.style.color = 'var(--brass-dim)';
+    loadTrackedList();
+  } else {
+    el('competitors-tracked-view').style.display = 'none';
+    el('competitors-alerts-view').style.display = 'block';
+    alertsBtn.style.background = 'var(--ink)';
+    alertsBtn.style.color = '#fff';
+    trackedBtn.style.background = 'transparent';
+    trackedBtn.style.color = 'var(--brass-dim)';
+    loadAlertsList();
+  }
+}
+
+function loadTrackedList() {
+  var email = lsGet('email');
+  var wrap = el('tracked-list');
+  if (!email) {
+    wrap.innerHTML = '<p class="muted-lo">Run a competitor analysis first.</p>';
+    return;
+  }
+  wrap.innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/competitor-watches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.watches.length === 0) {
+        wrap.innerHTML = '<p class="muted-lo">No tracked competitors yet. Run a Competitor Analysis to start tracking a set.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.watches.length; i++) {
+        var w = data.watches[i];
+        html += '<div style="border-top:1px solid var(--line-paper);padding:10px 0;display:flex;justify-content:space-between;align-items:center;">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(w.watchName) + '</b><div class="muted-lo" style="font-size:12px;">' + w.competitorCount + ' competitors \u00B7 last checked ' + new Date(w.lastCheckedAt).toLocaleDateString() + '</div></div>';
+        html += '<button class="btn btn-ghost competitor-watch-delete-btn" data-id="' + escapeHtml(w.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Delete</button>';
+        html += '</div>';
+      }
+      wrap.innerHTML = html;
+      var delBtns = wrap.querySelectorAll('.competitor-watch-delete-btn');
+      for (var j = 0; j < delBtns.length; j++) {
+        delBtns[j].addEventListener('click', function () {
+          var id = this.getAttribute('data-id');
+          fetch('/api/competitor-watches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', email: lsGet('email'), id: id })
+          }).then(function () { loadTrackedList(); });
+        });
+      }
+    })
+    .catch(function (e) {
+      wrap.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+function loadAlertsList() {
+  var email = lsGet('email');
+  var wrap = el('alerts-list');
+  if (!email) {
+    wrap.innerHTML = '<p class="muted-lo">Run a competitor analysis first.</p>';
+    return;
+  }
+  wrap.innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/competitor-alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.alerts.length === 0) {
+        wrap.innerHTML = '<p class="muted-lo">No alerts yet. You\u2019ll see one here the day a tracked competitor\u2019s page actually changes.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.alerts.length; i++) {
+        var a = data.alerts[i];
+        html += '<div style="border-top:1px solid var(--line-paper);padding:10px 0;display:flex;justify-content:space-between;align-items:center;' + (a.isRead ? '' : 'background:#FBF8F0;margin:0 -6px;padding:10px 6px;') + '">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(a.competitorName) + '</b> changed their page<div class="muted-lo" style="font-size:12px;">' + escapeHtml(a.watchName) + ' \u00B7 detected ' + new Date(a.detectedAt).toLocaleDateString() + '</div></div>';
+        html += '<button class="btn btn-ghost alert-explain-btn" data-id="' + escapeHtml(a.id) + '" type="button" style="padding:6px 10px;font-size:12px;">What changed?</button>';
+        html += '</div>';
+      }
+      wrap.innerHTML = html;
+      var expBtns = wrap.querySelectorAll('.alert-explain-btn');
+      for (var j = 0; j < expBtns.length; j++) {
+        expBtns[j].addEventListener('click', function () { openExplainChangeModal(this.getAttribute('data-id')); });
+      }
+      refreshAlertBadge(data.alerts);
+    })
+    .catch(function (e) {
+      wrap.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+function refreshAlertBadge(alerts) {
+  var unread = alerts.filter(function (a) { return !a.isRead; }).length;
+  el('alert-count-badge').textContent = unread > 0 ? unread : '';
+}
+
+function openExplainChangeModal(alertId) {
+  el('explain-change-body').innerHTML = 'Loading…';
+  el('explain-change-modal').className = 'modal-veil open';
+
+  if (!lsGet('ai_key')) {
+    el('explain-change-body').innerHTML = '<h3>AI key required</h3><p class="muted-lo">Add your AI key in Settings to generate a summary of what changed.</p>';
+    return;
+  }
+
+  fetch('/api/competitor-alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'explainChange',
+      email: lsGet('email'),
+      id: alertId,
+      aiProvider: lsGet('ai_provider') || 'openai',
+      aiApiKey: lsGet('ai_key') || '',
+      aiModel: lsGet('ai_model') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('explain-change-body').innerHTML = '<h3>Could not generate summary</h3><p class="status-bad">' + escapeHtml(data.error ? data.error.message : 'Something went wrong.') + '</p>';
+        return;
+      }
+      var e = data.explanation;
+      el('explain-change-body').innerHTML = '<h3>What changed</h3><p style="font-size:14px;">' + escapeHtml(e.summary) + '</p><span class="tichip" style="cursor:default;">' + escapeHtml(e.changeType) + '</span>';
+      fetch('/api/competitor-alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markRead', email: lsGet('email'), id: alertId })
+      }).then(function () { loadAlertsList(); });
+    })
+    .catch(function (e) {
+      el('explain-change-body').innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('btn-close-explain-change-modal').addEventListener('click', function () {
+  el('explain-change-modal').className = 'modal-veil';
+});
+
+// ---- Playbooks modal -----------------------------------------------------
+
+el('nav-playbooks-link').addEventListener('click', function () {
+  el('playbooks-modal').className = 'modal-veil open';
+  loadPlaybooksModalList();
+});
+el('btn-close-playbooks-modal').addEventListener('click', function () {
+  el('playbooks-modal').className = 'modal-veil';
+});
+
+function loadPlaybooksModalList() {
+  var email = lsGet('email');
+  var wrap = el('playbooks-list');
+  if (!email) {
+    wrap.innerHTML = '<p class="muted-lo">Run a Transcript Playbook dissection first.</p>';
+    return;
+  }
+  wrap.innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/playbooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.playbooks.length === 0) {
+        wrap.innerHTML = '<p class="muted-lo">No playbooks yet. Run a dissection to build your first one.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.playbooks.length; i++) {
+        var pb = data.playbooks[i];
+        html += '<div style="border-top:1px solid var(--line-paper);padding:10px 0;display:flex;justify-content:space-between;align-items:center;">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(pb.playbookTitle || pb.sourceLabel) + '</b><div class="muted-lo" style="font-size:12px;">' + escapeHtml(pb.sourceLabel) + ' \u00B7 ' + pb.tacticCount + ' tactics \u00B7 ' + new Date(pb.createdAt).toLocaleDateString() + '</div></div>';
+        html += '<div style="display:flex;gap:6px;"><button class="btn btn-ghost playbook-open-btn" data-id="' + escapeHtml(pb.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Open</button>';
+        html += '<button class="btn btn-ghost playbook-delete-btn" data-id="' + escapeHtml(pb.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Delete</button></div>';
+        html += '</div>';
+      }
+      wrap.innerHTML = html;
+      var openBtns = wrap.querySelectorAll('.playbook-open-btn');
+      for (var j = 0; j < openBtns.length; j++) {
+        openBtns[j].addEventListener('click', function () { openPlaybookViewModal(this.getAttribute('data-id')); });
+      }
+      var delBtns = wrap.querySelectorAll('.playbook-delete-btn');
+      for (var k = 0; k < delBtns.length; k++) {
+        delBtns[k].addEventListener('click', function () {
+          var id = this.getAttribute('data-id');
+          fetch('/api/playbooks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', email: lsGet('email'), id: id })
+          }).then(function () { loadPlaybooksModalList(); });
+        });
+      }
+    })
+    .catch(function (e) {
+      wrap.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+function openPlaybookViewModal(id) {
+  el('playbook-view-body').innerHTML = 'Loading…';
+  el('playbook-view-modal').className = 'modal-veil open';
+  fetch('/api/playbooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get', email: lsGet('email'), id: id })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('playbook-view-body').innerHTML = '<p class="status-bad">' + escapeHtml(data.error ? data.error.message : 'Could not load that playbook.') + '</p>';
+        return;
+      }
+      CURRENT_PLAYBOOK_FOR_COPY = { sourceLabel: data.playbook.sourceLabel, result: data.playbook.result };
+      el('playbook-view-body').innerHTML = buildPlaybookViewHtml(data.playbook.sourceLabel, data.playbook.result);
+    })
+    .catch(function (e) {
+      el('playbook-view-body').innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+function buildPlaybookViewHtml(sourceLabel, result) {
+  var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(result.playbook ? result.playbook.title : 'Playbook') + '</h3>';
+  html += '<p class="muted-lo" style="font-size:13px;margin-bottom:16px;">' + escapeHtml(sourceLabel) + '</p>';
+  for (var i = 0; i < (result.whatTheyDid || []).length; i++) {
+    var t = result.whatTheyDid[i];
+    html += '<div class="opp"><h4>' + escapeHtml(t.tactic) + '</h4><p>' + escapeHtml(t.howTheyDidIt) + '</p></div>';
+  }
+  html += '<div class="gapbox"><b>How you can do it:</b> ' + escapeHtml(result.replicableMechanic) + '</div>';
+  if (result.playbook && result.playbook.steps) {
+    html += '<ol style="margin:16px 0 0;padding-left:20px;">';
+    for (var s = 0; s < result.playbook.steps.length; s++) {
+      var step = result.playbook.steps[s];
+      html += '<li style="margin-bottom:10px;font-size:13.5px;"><b>' + escapeHtml(step.action) + '</b> <span class="muted-lo">(' + escapeHtml(step.estimatedTime) + ')</span><div style="color:var(--muted-lo);">' + escapeHtml(step.details) + '</div></li>';
+    }
+    html += '</ol>';
+  }
+  return html;
+}
+
+el('btn-close-playbook-view-modal').addEventListener('click', function () {
+  el('playbook-view-modal').className = 'modal-veil';
+});
+
+el('btn-copy-playbook').addEventListener('click', function () {
+  if (!CURRENT_PLAYBOOK_FOR_COPY) return;
+  copyPlaybookAsText(CURRENT_PLAYBOOK_FOR_COPY.sourceLabel, CURRENT_PLAYBOOK_FOR_COPY.result);
 });
 
 </script>
