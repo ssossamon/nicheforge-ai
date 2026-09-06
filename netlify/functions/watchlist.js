@@ -97,5 +97,23 @@ exports.handler = async function (event) {
     }
   }
 
+  if (action === 'debug_raw') {
+    try {
+      const allListing = await store.list();
+      const directGet = await store.get(key, { type: 'json' });
+      return http.json(200, {
+        success: true,
+        debug: {
+          expectedKey: key,
+          directGetResult: directGet,
+          allKeysInStore: allListing.blobs.map(function (b) { return b.key; }),
+          prefixUsedForList: email + '::'
+        }
+      });
+    } catch (e) {
+      return http.fail(500, 'debug_failed', e.message);
+    }
+  }
+
   return http.fail(400, 'unknown_action', 'Unknown action: ' + action);
 };
