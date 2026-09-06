@@ -5,10 +5,11 @@
 // manages the watchlist itself (add/remove/list) and returns whatever the
 // last recheck found for each entry.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');

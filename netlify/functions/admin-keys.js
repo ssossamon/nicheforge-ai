@@ -9,7 +9,7 @@
 //   export_leads    -> {}
 //   export_licenses -> {}
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 const license = require('./_shared/license');
 
@@ -32,6 +32,7 @@ function toCsv(rows, columns) {
 }
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');

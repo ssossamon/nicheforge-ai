@@ -4,7 +4,7 @@
 // BYOK AI synthesis) lives in _shared/scan-core.js so it can be reused by
 // batch-scan.js without duplicating logic.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 const license = require('./_shared/license');
 const core = require('./_shared/scan-core');
@@ -12,6 +12,7 @@ const core = require('./_shared/scan-core');
 const FREE_SCAN_LIMIT = 3;
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');

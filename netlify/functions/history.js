@@ -5,12 +5,13 @@
 // full, or delete it. No AI or YouTube calls happen here — it's a pure
 // read/write against the nforge-history Blobs store.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 
 const MAX_LIST = 100;
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');

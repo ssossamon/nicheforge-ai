@@ -4,10 +4,11 @@
 // fails (missing key, rate limit, etc.) — the user's free scan is never
 // blocked on ESP sync succeeding.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');

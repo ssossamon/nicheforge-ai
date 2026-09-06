@@ -6,12 +6,13 @@
 // anything whose Opportunity Score moved meaningfully or that picked up a
 // new breakout video since the last check.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const core = require('./_shared/scan-core');
 
 const SCORE_MOVE_THRESHOLD = 10;
 
-exports.handler = async function () {
+exports.handler = async function (event) {
+  connectLambda(event);
   const ytKey = process.env.YOUTUBE_API_KEY;
   if (!ytKey) {
     console.log('watchlist-recheck: YOUTUBE_API_KEY not configured, skipping run.');
