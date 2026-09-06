@@ -113,6 +113,35 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v1.6 — reports go beyond hooks: calendar, outlines, competitive landscape
+
+The Reports module now produces a genuine two-tier deliverable instead of a
+thin synthesis wrapper:
+
+**Executive summary (1-page)**: overview, priority order, a **content
+calendar** (every item assigned a day offset + Short/Long-form format, the
+AI spreads them out and prioritizes higher-scored/fresher items for earlier
+days), cross-cutting themes, a **consolidated monetization roadmap** (one
+sequenced plan across the whole set, not each item's angles repeated), and
+recommended next actions.
+
+**Detailed appendix**: **full outlines** (hook, sections, CTA) auto-generated
+for the top 3 items per the AI's own priority ranking — reuses the same
+engine as the standalone "Outline" button (`generate-outline.js` now
+exports `callAiForOutline`/`buildOutlineSystemPrompt` for this); a
+**competitive landscape** section aggregating which channels appear across
+multiple included items plus every real breakout video found; a **keyword
+appendix** of deduped real YouTube autocomplete suggestions across all
+items (video and channel evidence gathering now also fetch autocomplete
+suggestions, keyed off title, so every content type can contribute here);
+and the full per-item list.
+
+Both the in-app viewer and the PDF export follow this same structure. The
+competitive landscape and keyword appendix are pure data aggregation — no
+AI involved — while the calendar and monetization roadmap are additional
+fields on the same executive-summary AI call (not extra calls), and the
+outlines are up to 3 extra AI calls per report.
+
 ## v1.5 — Reports module
 
 A new "Reports" nav link compiles multiple History items (any mix of niche

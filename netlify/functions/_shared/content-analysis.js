@@ -194,6 +194,7 @@ async function gatherChannelEvidence(channelId, ytKey, ytKeySource) {
     viewToSubPoints = Math.max(0, Math.min(35, ratio * 100));
   }
   const channelHealthScore = Math.max(0, Math.min(100, Math.round(cadencePoints + trendPoints + viewToSubPoints)));
+  const autocompleteSuggestions = await core.gatherAutocompleteSuggestions(chItem.snippet.title);
 
   return {
     id: channelId,
@@ -209,6 +210,7 @@ async function gatherChannelEvidence(channelId, ytKey, ytKeySource) {
     recentVideos: recentVideos,
     channelHealthScore: channelHealthScore,
     channelHealthFormula: 'cadencePoints(0-35, best at 1-7 uploads/week) + trendPoints(0-30, newer vs older half of sample) + viewToSubPoints(0-35, avg recent views / subscriber count). Deterministic, computed from real YouTube data.',
+    autocompleteSuggestions: autocompleteSuggestions,
     dataSource: 'YouTube Data API v3 (channels.list, playlistItems.list, videos.list) — most recent uploads only, real numbers, no estimates.',
     youtubeKeySource: ytKeySource
   };
@@ -272,6 +274,7 @@ async function gatherVideoEvidence(videoId, ytKey, ytKeySource) {
 
   const topComments = await gatherTopCommentsForVideo(videoId, ytKey);
   const transcript = await fetchTranscript(videoId);
+  const autocompleteSuggestions = await core.gatherAutocompleteSuggestions(item.snippet.title);
 
   // ---- Transparent, deterministic Video Performance Score (0-100) -------
   const viewVelocity = views / daysSincePublished;
@@ -303,6 +306,7 @@ async function gatherVideoEvidence(videoId, ytKey, ytKeySource) {
       : null,
     topComments: topComments,
     transcript: transcript,
+    autocompleteSuggestions: autocompleteSuggestions,
     videoPerformanceScore: videoPerformanceScore,
     videoPerformanceFormula: 'velocityPoints(0-45, views/day since publish) + relativePoints(0-35, this video vs channel\u2019s recent average) + engagementPoints(0-20, (likes+comments)/views). Deterministic, computed from real YouTube data.',
     dataSource: 'YouTube Data API v3 (videos.list, commentThreads.list) plus the channel\u2019s recent uploads for comparison' + (transcript ? ' and YouTube\u2019s public caption track.' : '.'),

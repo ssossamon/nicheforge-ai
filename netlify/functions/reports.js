@@ -10,6 +10,7 @@
 const { getStore, connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 const core = require('./_shared/scan-core');
+const outlineModule = require('./generate-outline');
 
 const MAX_ITEMS_PER_REPORT = 12;
 const MAX_LIST = 50;
@@ -98,6 +99,14 @@ exports.handler = async function (event) {
       );
     }
 
+    // Full outlines for the top 3 items per the AI's own priority ranking —
+    // not just the title chips each item already had.
+    const topItemOutlines = await generateTopItemOutlines(aiProvider, aiApiKey, aiModel, items, executiveSummary.rankedItems);
+
+    // Pure data aggregation — no AI involved in either of these.
+    const competitiveLandscape = buildCompetitiveLandscape(items);
+    const keywordAppendix = buildKeywordAppendix(items);
+
     // Store a self-contained snapshot of each item — a report should still
     // make sense even if the original History entry is later deleted.
     const snapshot = items.map(function (rec) {
@@ -119,6 +128,9 @@ exports.handler = async function (event) {
       title: title,
       items: snapshot,
       executiveSummary: executiveSummary,
+      topItemOutlines: topItemOutlines,
+      competitiveLandscape: competitiveLandscape,
+      keywordAppendix: keywordAppendix,
       createdAt: new Date().toISOString()
     };
 
@@ -193,6 +205,132 @@ exports.handler = async function (event) {
 // in the scores/evidence each item already has (never invents new numbers).
 // ===========================================================================
 
+// ===========================================================================
+// Full outlines for the top-ranked items — not just their existing title
+// chips. Reuses the same AI-calling logic as the standalone "Outline"
+// button (generate-outline.js) so there's one implementation, not two.
+// ===========================================================================
+
+const TOP_OUTLINE_COUNT = 3;
+
+function pickSeedTitle(rec) {
+  if (rec.contentType === 'video' && rec.ai && rec.ai.spinOffIdeas && rec.ai.spinOffIdeas.length) {
+    return rec.ai.spinOffIdeas[0];
+  }
+  if (rec.contentType === 'channel' && rec.ai && rec.ai.contentOpportunities && rec.ai.contentOpportunities.length) {
+    return rec.ai.contentOpportunities[0];
+  }
+  if (rec.contentType === 'transcript' && rec.ai && rec.ai.suggestedTitles && rec.ai.suggestedTitles.length) {
+    return rec.ai.suggestedTitles[0];
+  }
+  if (rec.ai && rec.ai.opportunities && rec.ai.opportunities.length && rec.ai.opportunities[0].titleIdeas && rec.ai.opportunities[0].titleIdeas.length) {
+    return rec.ai.opportunities[0].titleIdeas[0];
+  }
+  return rec.query;
+}
+
+async function generateTopItemOutlines(provider, apiKey, model, items, rankedItems) {
+  // Follow the AI's own priority order when we have one; otherwise just
+  // take the items in the order they were selected.
+  const orderedQueries = (rankedItems || []).map(function (r) { return r.query; });
+  const ordered = items.slice().sort(function (a, b) {
+    const ia = orderedQueries.indexOf(a.query);
+    const ib = orderedQueries.indexOf(b.query);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  const top = ordered.slice(0, TOP_OUTLINE_COUNT);
+  const results = [];
+  for (const rec of top) {
+    const seedTitle = pickSeedTitle(rec);
+    const systemPrompt = outlineModule.buildOutlineSystemPrompt();
+    const userPrompt =
+      'CHOSEN TITLE: "' + seedTitle + '"\n' +
+      'SOURCE ITEM: [' + (rec.contentType || 'niche') + '] ' + rec.query + '\n' +
+      'REAL SCORE FOR THIS ITEM: ' + rec.score + '\n' +
+      (rec.evidence && rec.evidence.avgViews ? 'Average/real views: ' + rec.evidence.avgViews + '\n' : '') +
+      '\nProduce the JSON outline described in your instructions for this exact title.';
+    try {
+      const outline = await outlineModule.callAiForOutline(provider, apiKey, model, systemPrompt, userPrompt);
+      results.push({ query: rec.query, seedTitle: seedTitle, outline: outline });
+    } catch (e) {
+      // A single outline failing (rate limit, malformed response) never
+      // blocks the rest of the report from being generated.
+      results.push({ query: rec.query, seedTitle: seedTitle, outline: null, error: e.message });
+    }
+  }
+  return results;
+}
+
+// ===========================================================================
+// Competitive landscape — pure aggregation across items, no AI involved.
+// Which channels keep showing up, and where the real breakout videos were.
+// ===========================================================================
+
+function buildCompetitiveLandscape(items) {
+  const channelMap = {};
+
+  function record(key, title, query) {
+    if (!key || !title) return;
+    if (!channelMap[key]) channelMap[key] = { title: title, appearances: 0, seenIn: [] };
+    channelMap[key].appearances++;
+    if (channelMap[key].seenIn.indexOf(query) === -1) channelMap[key].seenIn.push(query);
+  }
+
+  const breakoutVideos = [];
+
+  items.forEach(function (rec) {
+    const ev = rec.evidence;
+    if (!ev) return;
+    if (rec.contentType === 'channel' && ev.title) {
+      record(ev.id || ev.title, ev.title, rec.query);
+    } else if (rec.contentType === 'video' && ev.channelTitle) {
+      record(ev.channelId || ev.channelTitle, ev.channelTitle, rec.query);
+    } else if (ev.topVideos) {
+      // niche scans carry a real list of channels behind the top videos
+      ev.topVideos.forEach(function (v) {
+        record(v.channelId || v.channelTitle, v.channelTitle, rec.query);
+      });
+    }
+    if (ev.breakoutVideos && ev.breakoutVideos.length) {
+      ev.breakoutVideos.forEach(function (b) {
+        breakoutVideos.push({ title: b.title, channelTitle: b.channelTitle, views: b.views, foundIn: rec.query });
+      });
+    }
+  });
+
+  const topChannels = Object.keys(channelMap)
+    .map(function (k) { return channelMap[k]; })
+    .sort(function (a, b) { return b.appearances - a.appearances; })
+    .slice(0, 15);
+
+  return { topChannels: topChannels, breakoutVideos: breakoutVideos.slice(0, 15) };
+}
+
+// ===========================================================================
+// Keyword appendix — real autocomplete suggestions from every item that has
+// them, deduped and counted by how many items surfaced each one.
+// ===========================================================================
+
+function buildKeywordAppendix(items) {
+  const keywordMap = {};
+  items.forEach(function (rec) {
+    const suggestions = rec.evidence && rec.evidence.autocompleteSuggestions;
+    if (!suggestions || !suggestions.length) return;
+    suggestions.forEach(function (kw) {
+      const norm = String(kw).toLowerCase().trim();
+      if (!norm) return;
+      if (!keywordMap[norm]) keywordMap[norm] = { keyword: kw, count: 0, seenIn: [] };
+      keywordMap[norm].count++;
+      if (keywordMap[norm].seenIn.indexOf(rec.query) === -1) keywordMap[norm].seenIn.push(rec.query);
+    });
+  });
+  return Object.keys(keywordMap)
+    .map(function (k) { return keywordMap[k]; })
+    .sort(function (a, b) { return b.count - a.count; })
+    .slice(0, 40);
+}
+
 async function generateExecutiveSummary(provider, apiKey, model, title, items) {
   const systemPrompt =
     'You are compiling an executive summary across several already-completed pieces of YouTube research (niche scans, ' +
@@ -200,10 +338,17 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
     'synthesizing ACROSS them, not re-analyzing any one of them, and must never invent a number not already given. ' +
     'Respond with STRICT JSON only, no markdown fences, matching exactly: ' +
     '{"overview":string,"rankedItems":[{"query":string,"reason":string}],"crossCuttingThemes":[string,string],' +
-    '"recommendedNextActions":[string,string,string]}. ' +
+    '"recommendedNextActions":[string,string,string],' +
+    '"monetizationRoadmap":[{"query":string,"angle":string,"sequencing":string}],' +
+    '"contentCalendar":[{"query":string,"dayOffset":number,"format":"Short"|"Long-form","rationale":string}]}. ' +
     '"rankedItems" must list the included items in the order you\u2019d prioritize acting on them, citing each one\u2019s real score in "reason". ' +
     '"crossCuttingThemes" are patterns visible across multiple items (shared content gaps, recurring monetization angles, etc.) — ' +
-    'only include a theme if it genuinely shows up in two or more items.';
+    'only include a theme if it genuinely shows up in two or more items. ' +
+    '"monetizationRoadmap" is ONE cohesive plan across the whole set (not a repeat of each item\u2019s own angles) — sequence which niche/video/channel ' +
+    'to monetize first and why, grounded in the real scores/evidence given. ' +
+    '"contentCalendar" assigns every included item a "dayOffset" (0 = today, integers only, spread sensibly so not everything lands on day 0 — ' +
+    'prioritize higher-scored or fresher items for earlier days) and a "format" — use "Short" if that item\u2019s evidence shows a high Shorts share ' +
+    'or is itself a Short, otherwise "Long-form".';
 
   const itemsBlock = items
     .map(function (rec, i) {
@@ -298,6 +443,8 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
   if (!Array.isArray(parsed.rankedItems)) parsed.rankedItems = [];
   if (!Array.isArray(parsed.crossCuttingThemes)) parsed.crossCuttingThemes = [];
   if (!Array.isArray(parsed.recommendedNextActions)) parsed.recommendedNextActions = [];
+  if (!Array.isArray(parsed.monetizationRoadmap)) parsed.monetizationRoadmap = [];
+  if (!Array.isArray(parsed.contentCalendar)) parsed.contentCalendar = [];
   return parsed;
 }
 

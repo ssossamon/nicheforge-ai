@@ -1913,9 +1913,13 @@ el('reports-list-body').addEventListener('click', function (e) {
 function openReportView(report) {
   CURRENT_REPORT = report;
   var s = report.executiveSummary;
-  var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(report.title) + '</h3>';
+  var html = '';
+
+  // ---- Executive summary (1-page, shareable on its own) ------------------
+  html += '<h3 style="margin-bottom:2px;">' + escapeHtml(report.title) + '</h3>';
   html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:16px;">' + report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleString() + '</div>';
   html += '<div class="opp"><h4>Overview</h4><p>' + escapeHtml(s.overview) + '</p></div>';
+
   if (s.rankedItems && s.rankedItems.length) {
     html += '<div class="opp"><h4>Priority order</h4><ol style="margin:0;padding-left:20px;font-size:14px;">';
     for (var i = 0; i < s.rankedItems.length; i++) {
@@ -1923,23 +1927,100 @@ function openReportView(report) {
     }
     html += '</ol></div>';
   }
+
+  if (s.contentCalendar && s.contentCalendar.length) {
+    var sortedCal = s.contentCalendar.slice().sort(function (a, b) { return a.dayOffset - b.dayOffset; });
+    html += '<div class="opp"><h4>Content calendar</h4><table style="width:100%;border-collapse:collapse;font-size:13.5px;">';
+    html += '<tr style="border-bottom:1px solid var(--line-paper);text-align:left;"><th style="padding:4px;">Day</th><th style="padding:4px;">Topic</th><th style="padding:4px;">Format</th></tr>';
+    for (var c = 0; c < sortedCal.length; c++) {
+      var entry = sortedCal[c];
+      var dateLabel = entry.dayOffset === 0 ? 'Today' : 'Day ' + entry.dayOffset;
+      html += '<tr style="border-bottom:1px solid var(--line-paper);"><td style="padding:4px;">' + dateLabel + '</td><td style="padding:4px;">' + escapeHtml(entry.query) + '</td><td style="padding:4px;">' + escapeHtml(entry.format) + '</td></tr>';
+    }
+    html += '</table></div>';
+  }
+
   if (s.crossCuttingThemes && s.crossCuttingThemes.length) {
     html += '<div class="opp"><h4>Cross-cutting themes</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
     for (var t = 0; t < s.crossCuttingThemes.length; t++) html += '<li>' + escapeHtml(s.crossCuttingThemes[t]) + '</li>';
     html += '</ul></div>';
   }
+
+  if (s.monetizationRoadmap && s.monetizationRoadmap.length) {
+    html += '<div class="opp"><h4>Monetization roadmap</h4>';
+    for (var m = 0; m < s.monetizationRoadmap.length; m++) {
+      var mr = s.monetizationRoadmap[m];
+      html += '<div style="margin-bottom:8px;font-size:14px;"><b>' + escapeHtml(mr.query) + ':</b> ' + escapeHtml(mr.angle) + ' <span class="muted-lo">(' + escapeHtml(mr.sequencing) + ')</span></div>';
+    }
+    html += '</div>';
+  }
+
   if (s.recommendedNextActions && s.recommendedNextActions.length) {
     html += '<div class="opp"><h4>Recommended next actions</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
     for (var n = 0; n < s.recommendedNextActions.length; n++) html += '<li>' + escapeHtml(s.recommendedNextActions[n]) + '</li>';
     html += '</ul></div>';
   }
-  html += '<div style="margin-top:16px;border-top:1px solid var(--line-paper);padding-top:12px;">';
-  html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Included items</b></div>';
+
+  // ---- Detailed appendix --------------------------------------------------
+  html += '<div style="margin-top:24px;border-top:2px solid var(--brass);padding-top:14px;">';
+  html += '<h4 style="color:var(--brass-dim);">Detailed appendix</h4>';
+
+  if (report.topItemOutlines && report.topItemOutlines.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:12px 0 8px;"><b>Full outlines for top items</b></div>';
+    for (var o = 0; o < report.topItemOutlines.length; o++) {
+      var to = report.topItemOutlines[o];
+      html += '<div style="border-top:1px solid var(--line-paper);padding:10px 0;">';
+      html += '<div style="font-size:13.5px;margin-bottom:4px;"><b>' + escapeHtml(to.query) + '</b> \u2192 "' + escapeHtml(to.seedTitle) + '"</div>';
+      if (to.outline) {
+        html += '<div style="font-size:13px;font-style:italic;margin-bottom:6px;">\u201C' + escapeHtml(to.outline.hook) + '\u201D</div>';
+        html += '<ol style="margin:0;padding-left:18px;font-size:13px;">';
+        for (var sec = 0; sec < to.outline.sections.length; sec++) {
+          html += '<li>' + escapeHtml(to.outline.sections[sec].title) + '</li>';
+        }
+        html += '</ol>';
+      } else {
+        html += '<div class="muted-lo" style="font-size:12.5px;">Outline could not be generated for this item.</div>';
+      }
+      html += '</div>';
+    }
+  }
+
+  if (report.competitiveLandscape && report.competitiveLandscape.topChannels && report.competitiveLandscape.topChannels.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:16px 0 8px;"><b>Competitive landscape \u2014 channels appearing across your items</b></div>';
+    html += '<ul style="margin:0;padding-left:18px;font-size:13.5px;">';
+    for (var ch = 0; ch < report.competitiveLandscape.topChannels.length; ch++) {
+      var chan = report.competitiveLandscape.topChannels[ch];
+      html += '<li>' + escapeHtml(chan.title) + ' \u2014 seen in ' + chan.appearances + ' item(s): ' + escapeHtml(chan.seenIn.join(', ')) + '</li>';
+    }
+    html += '</ul>';
+  }
+
+  if (report.competitiveLandscape && report.competitiveLandscape.breakoutVideos && report.competitiveLandscape.breakoutVideos.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:14px 0 8px;"><b>Real breakout videos found across items</b></div>';
+    html += '<ul style="margin:0;padding-left:18px;font-size:13.5px;">';
+    for (var bv = 0; bv < report.competitiveLandscape.breakoutVideos.length; bv++) {
+      var b = report.competitiveLandscape.breakoutVideos[bv];
+      html += '<li>' + escapeHtml(b.title) + ' (' + escapeHtml(b.channelTitle) + ') \u2014 ' + b.views.toLocaleString() + ' views, found in "' + escapeHtml(b.foundIn) + '"</li>';
+    }
+    html += '</ul>';
+  }
+
+  if (report.keywordAppendix && report.keywordAppendix.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin:16px 0 8px;"><b>Keyword appendix \u2014 real autocomplete suggestions across all items</b></div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    for (var kw = 0; kw < report.keywordAppendix.length; kw++) {
+      html += '<span class="tichip" style="cursor:default;font-size:12px;">' + escapeHtml(report.keywordAppendix[kw].keyword) + (report.keywordAppendix[kw].count > 1 ? ' (' + report.keywordAppendix[kw].count + ')' : '') + '</span>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div class="muted-lo" style="font-size:13px;margin:16px 0 8px;"><b>All included items</b></div>';
   for (var j = 0; j < report.items.length; j++) {
     var it = report.items[j];
     html += '<div style="font-size:13.5px;padding:6px 0;border-top:1px solid var(--line-paper);">[' + contentTypeLabel(it.contentType) + '] ' + escapeHtml(it.query) + ' \u2014 score ' + (it.score === null ? 'n/a' : it.score) + '</div>';
   }
   html += '</div>';
+
   el('report-view-body').innerHTML = html;
   el('report-view-modal').className = 'modal-veil open';
 }
@@ -1977,6 +2058,7 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   addLine(report.title, 20, 'bold', 4);
   addLine(report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleDateString(), 10, 'normal', 14);
 
+  addLine('EXECUTIVE SUMMARY', 11, 'bold', 8);
   addLine('Overview', 13, 'bold', 4);
   addLine(s.overview, 10, 'normal', 12);
 
@@ -1988,9 +2070,27 @@ el('btn-export-report-pdf').addEventListener('click', function () {
     y += 8;
   }
 
+  if (s.contentCalendar && s.contentCalendar.length) {
+    addLine('Content calendar', 13, 'bold', 4);
+    var sortedCal = s.contentCalendar.slice().sort(function (a, b) { return a.dayOffset - b.dayOffset; });
+    for (var c = 0; c < sortedCal.length; c++) {
+      var cal = sortedCal[c];
+      addLine((cal.dayOffset === 0 ? 'Today' : 'Day ' + cal.dayOffset) + ': ' + cal.query + ' (' + cal.format + ')', 10, 'normal', 3);
+    }
+    y += 8;
+  }
+
   if (s.crossCuttingThemes && s.crossCuttingThemes.length) {
     addLine('Cross-cutting themes', 13, 'bold', 4);
     for (var t = 0; t < s.crossCuttingThemes.length; t++) addLine('\u2022 ' + s.crossCuttingThemes[t], 10, 'normal', 3);
+    y += 8;
+  }
+
+  if (s.monetizationRoadmap && s.monetizationRoadmap.length) {
+    addLine('Monetization roadmap', 13, 'bold', 4);
+    for (var m = 0; m < s.monetizationRoadmap.length; m++) {
+      addLine(s.monetizationRoadmap[m].query + ': ' + s.monetizationRoadmap[m].angle + ' (' + s.monetizationRoadmap[m].sequencing + ')', 10, 'normal', 3);
+    }
     y += 8;
   }
 
@@ -2000,7 +2100,51 @@ el('btn-export-report-pdf').addEventListener('click', function () {
     y += 8;
   }
 
-  addLine('Included items', 13, 'bold', 6);
+  doc.addPage();
+  y = margin;
+  addLine('DETAILED APPENDIX', 11, 'bold', 10);
+
+  if (report.topItemOutlines && report.topItemOutlines.length) {
+    addLine('Full outlines for top items', 13, 'bold', 6);
+    for (var o = 0; o < report.topItemOutlines.length; o++) {
+      var to = report.topItemOutlines[o];
+      addLine(to.query + ' \u2192 "' + to.seedTitle + '"', 11, 'bold', 2);
+      if (to.outline) {
+        addLine('Hook: ' + to.outline.hook, 9, 'italic', 3);
+        for (var sec = 0; sec < to.outline.sections.length; sec++) {
+          addLine((sec + 1) + '. ' + to.outline.sections[sec].title, 9, 'normal', 2);
+        }
+      } else {
+        addLine('(outline could not be generated)', 9, 'italic', 2);
+      }
+      y += 6;
+    }
+  }
+
+  if (report.competitiveLandscape && report.competitiveLandscape.topChannels && report.competitiveLandscape.topChannels.length) {
+    addLine('Competitive landscape', 13, 'bold', 6);
+    for (var ch = 0; ch < report.competitiveLandscape.topChannels.length; ch++) {
+      var chan = report.competitiveLandscape.topChannels[ch];
+      addLine(chan.title + ' \u2014 seen in ' + chan.appearances + ' item(s): ' + chan.seenIn.join(', '), 9, 'normal', 2);
+    }
+    y += 8;
+  }
+
+  if (report.competitiveLandscape && report.competitiveLandscape.breakoutVideos && report.competitiveLandscape.breakoutVideos.length) {
+    addLine('Real breakout videos found across items', 13, 'bold', 6);
+    for (var bv = 0; bv < report.competitiveLandscape.breakoutVideos.length; bv++) {
+      var b = report.competitiveLandscape.breakoutVideos[bv];
+      addLine(b.title + ' (' + b.channelTitle + ') \u2014 ' + b.views.toLocaleString() + ' views, found in "' + b.foundIn + '"', 9, 'normal', 2);
+    }
+    y += 8;
+  }
+
+  if (report.keywordAppendix && report.keywordAppendix.length) {
+    addLine('Keyword appendix', 13, 'bold', 6);
+    addLine(report.keywordAppendix.map(function (k) { return k.keyword + (k.count > 1 ? ' (' + k.count + ')' : ''); }).join(', '), 9, 'normal', 8);
+  }
+
+  addLine('All included items', 13, 'bold', 6);
   for (var j = 0; j < report.items.length; j++) {
     var it = report.items[j];
     addLine('[' + contentTypeLabel(it.contentType) + '] ' + it.query + ' \u2014 score ' + (it.score === null ? 'n/a' : it.score), 10, 'bold', 2);

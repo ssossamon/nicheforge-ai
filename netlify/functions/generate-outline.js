@@ -156,3 +156,5 @@ function throwIfBad(res, provider) {
   }
   throw err;
 }
+
+module.exports.callAiForOutline = callAiForOutline;

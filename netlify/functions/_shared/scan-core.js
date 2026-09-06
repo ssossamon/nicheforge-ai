@@ -569,6 +569,7 @@ module.exports = {
   runFullScan: runFullScan,
   normalizeQueryKey: normalizeQueryKey,
   saveToHistory: saveToHistory,
+  gatherAutocompleteSuggestions: gatherAutocompleteSuggestions,
   YT_BASE: YT_BASE,
   fetchJson: fetchJson
 };
