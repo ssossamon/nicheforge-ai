@@ -7,6 +7,7 @@
 // new breakout video since the last check.
 
 const { getStore, connectLambda } = require('@netlify/blobs');
+const http = require('./_shared/http');
 const core = require('./_shared/scan-core');
 
 const SCORE_MOVE_THRESHOLD = 10;
@@ -38,9 +39,16 @@ exports.handler = async function (event) {
   let flagged = 0;
 
   for (const item of listing.blobs) {
+    // list() returns keys in raw/decoded form; watchlist keys are
+    // {email}::{query} with the email segment safeKey()-encoded at write
+    // time, so re-encode it here before get()/setJSON() will find it.
+    const sepIndex = item.key.indexOf('::');
+    if (sepIndex === -1) continue;
+    const encodedKey = http.safeKey(item.key.slice(0, sepIndex)) + '::' + http.safeKey(item.key.slice(sepIndex + 2));
+
     let rec;
     try {
-      rec = await store.get(item.key, { type: 'json' });
+      rec = await store.get(encodedKey, { type: 'json' });
     } catch (e) {
       continue;
     }
@@ -65,7 +73,7 @@ exports.handler = async function (event) {
         rec.flagReason = flagReason;
         flagged++;
       }
-      await store.setJSON(item.key, rec);
+      await store.setJSON(encodedKey, rec);
       checked++;
     } catch (e) {
       // A single topic failing (quota, no results, transient error) never

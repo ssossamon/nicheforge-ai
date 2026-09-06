@@ -95,7 +95,9 @@ exports.handler = async function (event) {
       const list = await leadsStore.list();
       const rows = [];
       for (const item of list.blobs) {
-        const rec = await leadsStore.get(item.key, { type: 'json' });
+        // list() returns keys in raw/decoded form; leads are keyed by a
+        // safeKey()-encoded email, so re-encode before get() will find it.
+        const rec = await leadsStore.get(http.safeKey(item.key), { type: 'json' });
         if (rec) rows.push(rec);
       }
       return http.csv(200, toCsv(rows, ['email', 'name', 'source', 'espSynced', 'firstSeenAt', 'lastSeenAt']), 'nicheforge-leads.csv');

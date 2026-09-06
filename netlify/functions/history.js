@@ -39,10 +39,17 @@ exports.handler = async function (event) {
 
   if (action === 'list') {
     try {
-      const listing = await store.list({ prefix: http.safeKey(email) + '::' });
+      // list() always returns keys in raw/decoded form, regardless of how
+      // they were written — the prefix must be raw, and each returned key
+      // must have its email segment re-encoded before get() will find it.
+      const rawPrefix = email + '::';
+      const listing = await store.list({ prefix: rawPrefix });
       const summaries = [];
       for (const item of listing.blobs) {
-        const rec = await store.get(item.key, { type: 'json' });
+        const sepIndex = item.key.indexOf('::');
+        if (sepIndex === -1) continue;
+        const encodedId = http.safeKey(item.key.slice(0, sepIndex)) + '::' + item.key.slice(sepIndex + 2);
+        const rec = await store.get(encodedId, { type: 'json' });
         if (rec) {
           summaries.push({ id: rec.id, query: rec.query, opportunityScore: rec.opportunityScore, avgViews: rec.avgViews, timestamp: rec.timestamp });
         }

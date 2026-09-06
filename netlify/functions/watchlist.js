@@ -85,10 +85,19 @@ exports.handler = async function (event) {
 
   if (action === 'list') {
     try {
-      const listing = await store.list({ prefix: keyPrefix });
+      // list() always returns keys in raw/decoded form, regardless of how
+      // they were written — so the prefix here must be raw too, and each
+      // returned key must be re-encoded before get() will find it.
+      const rawPrefix = email + '::';
+      const listing = await store.list({ prefix: rawPrefix });
       const items = [];
       for (const item of listing.blobs) {
-        const rec = await store.get(item.key, { type: 'json' });
+        const sepIndex = item.key.indexOf('::');
+        if (sepIndex === -1) continue;
+        const rawEmailPart = item.key.slice(0, sepIndex);
+        const rawQueryPart = item.key.slice(sepIndex + 2);
+        const encodedKey = http.safeKey(rawEmailPart) + '::' + http.safeKey(rawQueryPart);
+        const rec = await store.get(encodedKey, { type: 'json' });
         if (rec) items.push(rec);
       }
       items.sort(function (a, b) { return new Date(b.addedAt) - new Date(a.addedAt); });
@@ -96,28 +105,6 @@ exports.handler = async function (event) {
     } catch (e) {
       return http.fail(500, 'watchlist_list_failed', 'Could not load watchlist: ' + e.message);
     }
-  }
-
-  if (action === 'diag') {
-    const out = {};
-    try {
-      out.writeResult = await store.setJSON(key, { email: email, query: query, marker: 'diag-write', addedAt: new Date().toISOString() });
-    } catch (e) { out.writeError = e.message; }
-    try {
-      out.listNoPrefix = (await store.list()).blobs;
-    } catch (e) { out.listNoPrefixError = e.message; }
-    try {
-      out.listWithPrefix = (await store.list({ prefix: keyPrefix })).blobs;
-    } catch (e) { out.listWithPrefixError = e.message; }
-    try {
-      out.directGetTyped = await store.get(key, { type: 'json' });
-    } catch (e) { out.directGetTypedError = e.message; }
-    try {
-      out.directGetRaw = await store.get(key);
-    } catch (e) { out.directGetRawError = e.message; }
-    out.key = key;
-    out.keyPrefix = keyPrefix;
-    return http.json(200, { success: true, diag: out });
   }
 
   return http.fail(400, 'unknown_action', 'Unknown action: ' + action);
