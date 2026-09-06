@@ -156,6 +156,24 @@
   .evcell .k{font-size:11.5px;color:var(--muted-lo);}
   .evcell .v{font-family:'Space Grotesk';font-size:19px;margin-top:2px;}
   .opp{border-top:1px solid var(--line-paper);padding:16px 0;}
+  .report-deck{background:#eff6ff;padding:24px;border-radius:18px;color:#172033;}
+  .report-cover{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 72%,#f97316 145%);color:#fff;padding:34px;border-radius:18px;box-shadow:0 18px 45px rgba(29,78,216,.18);margin-bottom:18px;}
+  .report-cover .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;opacity:.82;}
+  .report-cover h2{font-size:30px;line-height:1.08;margin:9px 0 12px;color:#fff;}
+  .report-cover p{font-size:15px;line-height:1.65;max-width:760px;opacity:.94;}
+  .report-verdict{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;margin-top:12px;}
+  .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0;}
+  .report-card,.report-deck .opp{background:#fff;border:1px solid #dbeafe;border-radius:15px;padding:20px;box-shadow:0 8px 24px rgba(30,64,175,.06);}
+  .report-deck .opp{margin:14px 0;}
+  .report-card .kicker{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#1d4ed8;font-weight:800;margin-bottom:7px;}
+  .report-card h4,.report-deck .opp h4{font-size:17px;color:#172033;margin:0 0 8px;}
+  .report-card p,.report-deck .opp p,.report-deck li{font-size:14px;line-height:1.6;}
+  .report-score-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+  .report-score-pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:8px 11px;font-size:12px;}
+  .report-section-title{font-size:22px;margin:28px 0 12px;color:#172033;}
+  .report-timeline{display:grid;gap:10px;}
+  .report-step{display:grid;grid-template-columns:95px 1fr;gap:14px;background:#fff;border-left:4px solid #7c3aed;border-radius:12px;padding:15px 17px;}
+  .report-step strong{color:#7c3aed;font-size:12px;text-transform:uppercase;letter-spacing:.05em;}
   .opp h4{font-size:16px;margin-bottom:4px;}
   .opp p{font-size:14px;color:var(--muted-lo);margin:0 0 8px;}
   .titleideas{display:flex;flex-wrap:wrap;gap:8px;}
@@ -257,7 +275,7 @@
   .pb-severity-low{background:#E9F3EC;color:#2E7D4F;}
   .pb-factcheck{background:#FBF3E4;border:1px solid #E7CE9C;border-radius:4px;padding:12px 14px;font-size:12.5px;margin:10px 0 6px;}
   .pb-factcheck b{color:var(--brass-dim);}
-  @media (max-width:640px){.pb-callout-grid{grid-template-columns:1fr;}.pb-hero-stats{flex-wrap:wrap;gap:16px;}}
+  @media (max-width:640px){.pb-callout-grid,.report-grid{grid-template-columns:1fr;}.pb-hero-stats{flex-wrap:wrap;gap:16px;}.report-deck{padding:10px}.report-cover{padding:23px}.report-cover h2{font-size:24px}.report-step{grid-template-columns:1fr;gap:5px}}
 
   /* license box */
   .license-box{background:var(--ink-2);border:1px solid var(--line);border-radius:6px;padding:22px;display:flex;gap:14px;align-items:end;flex-wrap:wrap;}
@@ -726,26 +744,10 @@
 
 <div class="modal-veil" id="reports-modal">
   <div class="modal" style="max-width:620px;max-height:85vh;overflow-y:auto;">
-    <h3>Reports</h3>
-    <p class="muted-lo" style="font-size:13px;">Compile several History items into one consolidated report with an AI executive summary tying them together — grounded only in each item's real, already-computed score.</p>
-
-    <div style="display:flex;gap:8px;margin:14px 0;">
-      <button class="btn btn-ghost" id="reports-tab-build" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;">Build new report</button>
-      <button class="btn btn-ghost" id="reports-tab-list" type="button" style="flex:1;font-size:13px;">My reports</button>
-    </div>
-
-    <div id="reports-build-view">
-      <div class="field">
-        <label for="report-title">Report title</label>
-        <input type="text" id="report-title" placeholder="e.g. Q1 coffee niche research" />
-      </div>
-      <div class="muted-lo" style="font-size:13px;margin:10px 0 6px;"><b>Select History items to include (up to 12):</b></div>
-      <div id="reports-history-picker"><p class="muted-lo">Loading…</p></div>
-      <button class="btn btn-primary" id="btn-generate-report" type="button" style="margin-top:14px;width:auto;">Generate report</button>
-      <div id="report-generate-status" class="status-line"></div>
-    </div>
-
-    <div id="reports-list-view" style="display:none;">
+    <h3>Intelligence Reports</h3>
+    <p class="muted-lo" style="font-size:13px;">Every completed scan, competitor analysis, URL analysis, batch, and transcript playbook automatically creates a polished visual report. No History selection is required.</p>
+    <button class="btn btn-ghost" id="reports-tab-list" type="button" style="width:100%;background:var(--ink);color:#fff;font-size:13px;margin:14px 0;">Refresh report library</button>
+    <div id="reports-list-view">
       <div id="reports-list-body"><p class="muted-lo">Loading…</p></div>
     </div>
 
@@ -754,7 +756,7 @@
 </div>
 
 <div class="modal-veil" id="report-view-modal">
-  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
+  <div class="modal" style="max-width:1040px;max-height:92vh;overflow-y:auto;padding:12px;background:#eff6ff;">
     <div id="report-view-body">Loading…</div>
     <div style="display:flex;gap:10px;margin-top:16px;">
       <button class="btn btn-ghost" id="btn-export-report-pdf" type="button">Export PDF</button>
@@ -1451,6 +1453,10 @@ function doScan(query, email) {
       }
       el('scan-status').textContent = '';
       renderSingleResult(data);
+      createReportFromRun(data.query + ' Opportunity Report', [{
+        contentType: 'niche', query: data.query, score: data.evidence.opportunityScore,
+        avgViews: data.evidence.avgViews, evidence: data.evidence, ai: data.ai
+      }], email);
     })
     .catch(function (e) {
       btn.disabled = false;
@@ -1502,6 +1508,10 @@ function doBatchScan(topics, email) {
       }
       el('scan-status').textContent = '';
       renderBatchResults(data);
+      var reportItems = data.results.filter(function (r) { return r.success; }).map(function (r) {
+        return { contentType: 'niche', query: r.query, score: r.evidence.opportunityScore, avgViews: r.evidence.avgViews, evidence: r.evidence, ai: r.ai };
+      });
+      if (reportItems.length) createReportFromRun('Batch Opportunity Report', reportItems, email);
     })
     .catch(function (e) {
       btn.disabled = false;
@@ -1550,6 +1560,11 @@ function doAnalyze(input, email) {
       if (data.contentType === 'video') renderVideoAnalysis(data.evidence, data.ai);
       else if (data.contentType === 'channel') renderChannelAnalysis(data.evidence, data.ai);
       else renderTranscriptAnalysis(data.evidence, data.ai);
+      var analyzedScore = data.contentType === 'video' ? data.evidence.videoPerformanceScore : data.contentType === 'channel' ? data.evidence.channelHealthScore : data.ai.scriptQualityScore;
+      createReportFromRun((data.evidence.title || 'Content') + ' Intelligence Report', [{
+        contentType: data.contentType, query: data.evidence.title || input.slice(0, 80), score: analyzedScore,
+        avgViews: data.evidence.views || null, evidence: data.evidence, ai: data.ai
+      }], email);
     })
     .catch(function (e) {
       btn.disabled = false;
@@ -1598,6 +1613,11 @@ function doCompetitorAnalysis(bizName, bizDesc, competitors, watchName, email) {
       }
       el('scan-status').textContent = '';
       renderCompetitorAnalysis(data);
+      createReportFromRun(data.businessName + ' Competitive Intelligence Report', [{
+        contentType: 'competitor', query: data.businessName, score: data.analysis.competitivePositionScore,
+        avgViews: null, evidence: { competitivePositionScore: data.analysis.competitivePositionScore, competitorPages: data.competitorPages },
+        ai: data.analysis
+      }], email);
     })
     .catch(function (e) {
       btn.disabled = false;
@@ -1644,6 +1664,10 @@ function doDissectTranscript(input, email) {
       }
       el('scan-status').textContent = '';
       renderPlaybookResult(data.sourceLabel, data.result, data.meta);
+      createReportFromRun(data.sourceLabel + ' Playbook Report', [{
+        contentType: 'transcript', query: data.sourceLabel, score: null, avgViews: null,
+        evidence: { sourceLabel: data.sourceLabel }, ai: data.result
+      }], email);
     })
     .catch(function (e) {
       btn.disabled = false;
@@ -2845,34 +2869,16 @@ var CURRENT_REPORT = null;
 
 el('nav-reports-link').addEventListener('click', function () {
   el('reports-modal').className = 'modal-veil open';
-  showReportsTab('build');
+  showReportsTab('list');
 });
 el('btn-close-reports-modal').addEventListener('click', function () {
   el('reports-modal').className = 'modal-veil';
 });
-el('reports-tab-build').addEventListener('click', function () { showReportsTab('build'); });
 el('reports-tab-list').addEventListener('click', function () { showReportsTab('list'); });
 
-function showReportsTab(tab) {
-  var buildBtn = el('reports-tab-build');
-  var listBtn = el('reports-tab-list');
-  if (tab === 'build') {
-    el('reports-build-view').style.display = 'block';
-    el('reports-list-view').style.display = 'none';
-    buildBtn.style.background = 'var(--ink)';
-    buildBtn.style.color = '#fff';
-    listBtn.style.background = 'transparent';
-    listBtn.style.color = 'var(--brass-dim)';
-    loadHistoryPickerForReports();
-  } else {
-    el('reports-build-view').style.display = 'none';
-    el('reports-list-view').style.display = 'block';
-    listBtn.style.background = 'var(--ink)';
-    listBtn.style.color = '#fff';
-    buildBtn.style.background = 'transparent';
-    buildBtn.style.color = 'var(--brass-dim)';
-    loadReportsList();
-  }
+function showReportsTab() {
+  el('reports-list-view').style.display = 'block';
+  loadReportsList();
 }
 
 function contentTypeLabel(t) {
@@ -2883,103 +2889,40 @@ function contentTypeLabel(t) {
   return 'Niche';
 }
 
-function loadHistoryPickerForReports() {
-  var email = lsGet('email');
-  var picker = el('reports-history-picker');
-  if (!email) {
-    picker.innerHTML = '<p class="muted-lo">Run a scan or analysis first — reports are built from your History.</p>';
-    return;
-  }
-  picker.innerHTML = '<p class="muted-lo">Loading…</p>';
-  fetch('/api/history', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'list', email: email })
-  })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      if (!data.success || data.history.length === 0) {
-        picker.innerHTML = '<p class="muted-lo">No History items yet. Run a scan or analysis first.</p>';
-        return;
-      }
-      var html = '';
-      for (var i = 0; i < data.history.length; i++) {
-        var h = data.history[i];
-        html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line-paper);font-size:13.5px;">';
-        html += '<input type="checkbox" class="report-item-checkbox" value="' + escapeHtml(h.id) + '" style="width:auto;" />';
-        html += '<span style="flex:1;">[' + contentTypeLabel(h.contentType) + '] ' + escapeHtml(h.query) + '</span>';
-        html += '<span class="muted-lo">score ' + (h.score === null ? 'n/a' : h.score) + '</span>';
-        html += '</label>';
-      }
-      picker.innerHTML = html;
-    })
-    .catch(function (e) {
-      picker.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
-    });
-}
-
-el('btn-generate-report').addEventListener('click', function () {
-  var email = lsGet('email');
-  var title = el('report-title').value.trim();
-  var checkboxes = document.querySelectorAll('.report-item-checkbox:checked');
-  var historyIds = [];
-  for (var i = 0; i < checkboxes.length; i++) historyIds.push(checkboxes[i].value);
-
-  var statusEl = el('report-generate-status');
-  if (!title) {
-    statusEl.className = 'status-line status-bad';
-    statusEl.textContent = 'Give the report a title.';
-    return;
-  }
-  if (historyIds.length === 0) {
-    statusEl.className = 'status-line status-bad';
-    statusEl.textContent = 'Select at least one History item.';
-    return;
-  }
-  if (!lsGet('ai_key')) {
-    el('reports-modal').className = 'modal-veil';
-    openSettingsModal();
-    return;
-  }
-
-  var btn = el('btn-generate-report');
-  btn.disabled = true;
-  btn.textContent = 'Generating…';
-  statusEl.className = 'status-line';
-  statusEl.textContent = '';
-
-  fetch('/api/reports', {
+function createReportFromRun(title, items, email) {
+  el('scan-status').className = 'status-line';
+  el('scan-status').textContent = 'Analysis complete. Building your visual intelligence report…';
+  return fetch('/api/reports', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      action: 'create',
+      action: 'create_run',
       email: email,
       title: title,
-      historyIds: historyIds,
+      items: items,
       aiProvider: lsGet('ai_provider') || 'openai',
-      aiApiKey: lsGet('ai_key') || ''
+      aiApiKey: lsGet('ai_key') || '',
+      aiModel: lsGet('ai_model') || ''
     })
   })
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      btn.disabled = false;
-      btn.textContent = 'Generate report';
       if (!data.success) {
-        statusEl.className = 'status-line status-bad';
-        statusEl.textContent = data.error ? data.error.message : 'Could not generate the report.';
-        return;
+        el('scan-status').className = 'status-line status-bad';
+        el('scan-status').textContent = 'Your analysis is safe, but its visual report could not be created: ' + (data.error ? data.error.message : 'Unknown report error.');
+        return null;
       }
-      statusEl.textContent = '';
-      el('reports-modal').className = 'modal-veil';
+      el('scan-status').className = 'status-line status-ok';
+      el('scan-status').textContent = 'Analysis and visual report saved.';
       openReportView(data.report);
+      return data.report;
     })
     .catch(function (e) {
-      btn.disabled = false;
-      btn.textContent = 'Generate report';
-      statusEl.className = 'status-line status-bad';
-      statusEl.textContent = 'Network error: ' + e.message;
+      el('scan-status').className = 'status-line status-bad';
+      el('scan-status').textContent = 'Your analysis is safe, but its visual report hit a network error: ' + e.message;
+      return null;
     });
-});
+}
 
 function loadReportsList() {
   var email = lsGet('email');
@@ -3043,12 +2986,36 @@ el('reports-list-body').addEventListener('click', function (e) {
 
 function openReportView(report) {
   CURRENT_REPORT = report;
-  var s = report.executiveSummary;
+  report.items = Array.isArray(report.items) ? report.items : [];
+  var s = report.executiveSummary || {};
+  var primary = report.items && report.items.length ? report.items[0] : {};
+  var verdict = s.verdict || { label: 'INTELLIGENCE REPORT', reason: s.overview || '' };
   var html = '';
 
-  // ---- Executive summary (1-page, shareable on its own) ------------------
-  html += '<h3 style="margin-bottom:2px;">' + escapeHtml(report.title) + '</h3>';
-  html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:16px;">' + report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleString() + '</div>';
+  html += '<div class="report-deck">';
+  html += '<section class="report-cover">';
+  html += '<div class="eyebrow">NicheForge AI · Opportunity Intelligence</div>';
+  html += '<h2>' + escapeHtml(report.title) + '</h2>';
+  html += '<p>' + escapeHtml(s.overview || 'Evidence-backed analysis and recommended actions from this completed run.') + '</p>';
+  html += '<div class="report-verdict">Verdict: ' + escapeHtml(verdict.label) + '</div>';
+  html += '<div class="report-score-row">';
+  if (primary.score !== null && primary.score !== undefined) html += '<div class="report-score-pill"><b>' + primary.score + '/100</b><br>Primary score</div>';
+  html += '<div class="report-score-pill"><b>' + report.items.length + '</b><br>Analyzed source' + (report.items.length === 1 ? '' : 's') + '</div>';
+  html += '<div class="report-score-pill"><b>' + new Date(report.createdAt).toLocaleDateString() + '</b><br>Evidence date</div>';
+  html += '</div></section>';
+
+  html += '<div class="report-grid">';
+  html += '<div class="report-card"><div class="kicker">Decision rationale</div><h4>Why this verdict</h4><p>' + escapeHtml(verdict.reason || s.overview || '') + '</p></div>';
+  html += '<div class="report-card"><div class="kicker">Market opening</div><h4>Best opportunity</h4><p>' + escapeHtml(s.marketOpportunity || s.overview || '') + '</p></div>';
+  if (s.audienceInsight) html += '<div class="report-card"><div class="kicker">Audience intelligence</div><h4>What the audience needs</h4><p>' + escapeHtml(s.audienceInsight) + '</p></div>';
+  if (s.keyRisks && s.keyRisks.length) {
+    html += '<div class="report-card"><div class="kicker">Risk review</div><h4>What could weaken the opportunity</h4><ul style="margin:0;padding-left:18px;">';
+    for (var kr = 0; kr < s.keyRisks.length; kr++) html += '<li>' + escapeHtml(s.keyRisks[kr]) + '</li>';
+    html += '</ul></div>';
+  }
+  html += '</div>';
+
+  html += '<h3 class="report-section-title">Strategic brief</h3>';
   html += '<div class="opp"><h4>Overview</h4><p>' + escapeHtml(s.overview) + '</p></div>';
 
   if (s.rankedItems && s.rankedItems.length) {
@@ -3090,6 +3057,16 @@ function openReportView(report) {
     html += '<div class="opp"><h4>Recommended next actions</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
     for (var n = 0; n < s.recommendedNextActions.length; n++) html += '<li>' + escapeHtml(s.recommendedNextActions[n]) + '</li>';
     html += '</ul></div>';
+  }
+
+  if (s.next30Days && s.next30Days.length) {
+    html += '<h3 class="report-section-title">30-day action plan</h3><div class="report-timeline">';
+    for (var nd = 0; nd < s.next30Days.length; nd++) {
+      html += '<div class="report-step"><strong>' + escapeHtml(s.next30Days[nd].phase) + '</strong><div><b>' + escapeHtml(s.next30Days[nd].action) + '</b>';
+      if (s.next30Days[nd].successMeasure) html += '<div class="muted-lo" style="font-size:12.5px;margin-top:4px;">Success signal: ' + escapeHtml(s.next30Days[nd].successMeasure) + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>';
   }
 
   // ---- Detailed appendix --------------------------------------------------
@@ -3151,6 +3128,7 @@ function openReportView(report) {
     html += '<div style="font-size:13.5px;padding:6px 0;border-top:1px solid var(--line-paper);">[' + contentTypeLabel(it.contentType) + '] ' + escapeHtml(it.query) + ' \u2014 score ' + (it.score === null ? 'n/a' : it.score) + '</div>';
   }
   html += '</div>';
+  html += '</div>';
 
   el('report-view-body').innerHTML = html;
   el('report-view-modal').className = 'modal-veil open';
@@ -3166,7 +3144,7 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   if (!jsPDFCtor) { alert('PDF library did not load. Check your internet connection and try again.'); return; }
 
   var report = CURRENT_REPORT;
-  var s = report.executiveSummary;
+  var s = report.executiveSummary || {};
   var doc = new jsPDFCtor({ unit: 'pt', format: 'letter' });
   var margin = 48;
   var y = margin;
@@ -3190,8 +3168,28 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   addLine(report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleDateString(), 10, 'normal', 14);
 
   addLine('EXECUTIVE SUMMARY', 11, 'bold', 8);
+  if (s.verdict && s.verdict.label) {
+    addLine('Verdict: ' + s.verdict.label, 15, 'bold', 3);
+    if (s.verdict.reason) addLine(s.verdict.reason, 10, 'normal', 10);
+  }
   addLine('Overview', 13, 'bold', 4);
-  addLine(s.overview, 10, 'normal', 12);
+  addLine(s.overview || 'Evidence-backed analysis from this completed run.', 10, 'normal', 12);
+
+  if (s.marketOpportunity) {
+    addLine('Market opportunity', 13, 'bold', 4);
+    addLine(s.marketOpportunity, 10, 'normal', 10);
+  }
+
+  if (s.audienceInsight) {
+    addLine('Audience intelligence', 13, 'bold', 4);
+    addLine(s.audienceInsight, 10, 'normal', 10);
+  }
+
+  if (s.keyRisks && s.keyRisks.length) {
+    addLine('Key risks', 13, 'bold', 4);
+    for (var r = 0; r < s.keyRisks.length; r++) addLine('\u2022 ' + s.keyRisks[r], 10, 'normal', 3);
+    y += 8;
+  }
 
   if (s.rankedItems && s.rankedItems.length) {
     addLine('Priority order', 13, 'bold', 4);
@@ -3228,6 +3226,15 @@ el('btn-export-report-pdf').addEventListener('click', function () {
   if (s.recommendedNextActions && s.recommendedNextActions.length) {
     addLine('Recommended next actions', 13, 'bold', 4);
     for (var n = 0; n < s.recommendedNextActions.length; n++) addLine((n + 1) + '. ' + s.recommendedNextActions[n], 10, 'normal', 3);
+    y += 8;
+  }
+
+  if (s.next30Days && s.next30Days.length) {
+    addLine('30-day action plan', 13, 'bold', 4);
+    for (var nd = 0; nd < s.next30Days.length; nd++) {
+      var step = s.next30Days[nd];
+      addLine(step.phase + ': ' + step.action + (step.successMeasure ? ' — Success signal: ' + step.successMeasure : ''), 10, 'normal', 4);
+    }
     y += 8;
   }
 

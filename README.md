@@ -1,9 +1,21 @@
-# NicheForge AI (v2.8)
+# NicheForge AI (v2.9)
 
 Real YouTube search data + your own AI provider (BYOK) → ranked content/niche
 opportunities, a content gap callout, and video title ideas for video and
 content marketers. Built for lead-list growth: every free scan requires an
 email, which is synced to ConvertKit and stored as a backup lead record.
+
+## v2.9 — Automatic Gamma-style reports
+
+Every successful single scan, batch scan, URL/channel analysis, competitor
+analysis, and transcript playbook now creates and saves its own visual
+intelligence report. Reports are built directly from the completed run, so
+they do not wait for or require an eventually-consistent History record.
+The report library replaces the old History-picker workflow. The new report
+layout includes a presentation-style cover, verdict, score/evidence cards,
+market opening, audience insight, risks, strategic brief, 30-day action plan,
+competitive evidence, keywords, and source appendix. If the additional report
+narrative call fails, the original analysis remains visible and saved.
 
 **One-line product statement:** Enter a topic, and NicheForge AI pulls real
 YouTube view/upload/channel data for it, scores the opportunity with a

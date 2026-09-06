@@ -58,6 +58,61 @@ async function handleRequest(event) {
 
   const emailKeyPrefix = http.safeKey(email) + '::';
 
+  // ---- create directly from the completed run -----------------------------
+  // Reports are first-class outputs of every run. They no longer depend on
+  // finding a just-written History record (which is eventually consistent).
+  if (action === 'create_run') {
+    const rawItems = Array.isArray(payload.items) ? payload.items.slice(0, MAX_ITEMS_PER_REPORT) : [];
+    const title = String(payload.title || '').trim() || 'NicheForge Intelligence Report';
+    const aiProvider = String(payload.aiProvider || '').trim().toLowerCase();
+    const aiApiKey = String(payload.aiApiKey || '').trim();
+    const aiModel = payload.aiModel ? String(payload.aiModel).trim() : '';
+    if (rawItems.length === 0) return http.fail(400, 'missing_run', 'The completed run did not include report data.');
+    if (!aiProvider || !aiApiKey) return http.fail(400, 'missing_ai_key', 'Add your AI provider and key in Settings first.');
+
+    const items = rawItems.map(function (rec) {
+      const evidence = rec && typeof rec.evidence === 'object' ? rec.evidence : {};
+      const ai = rec && typeof rec.ai === 'object' ? rec.ai : {};
+      return {
+        contentType: String((rec && rec.contentType) || 'niche').slice(0, 30),
+        query: String((rec && rec.query) || 'Untitled analysis').slice(0, 300),
+        score: typeof rec.score === 'number' && isFinite(rec.score) ? Math.max(0, Math.min(100, Math.round(rec.score))) : null,
+        avgViews: typeof rec.avgViews === 'number' && isFinite(rec.avgViews) ? rec.avgViews : null,
+        timestamp: String((rec && rec.timestamp) || new Date().toISOString()),
+        evidence: evidence,
+        ai: ai
+      };
+    });
+
+    let executiveSummary;
+    try {
+      executiveSummary = await generateExecutiveSummary(aiProvider, aiApiKey, aiModel, title, items);
+    } catch (e) {
+      return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message || 'Could not generate the visual report narrative.', e.whatToDoNext);
+    }
+
+    const reportId = http.safeKey(email) + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
+    const report = {
+      id: reportId,
+      email: email,
+      title: title,
+      reportKind: 'single-run',
+      visualVersion: 2,
+      items: items,
+      executiveSummary: executiveSummary,
+      topItemOutlines: [],
+      competitiveLandscape: buildCompetitiveLandscape(items),
+      keywordAppendix: buildKeywordAppendix(items),
+      createdAt: new Date().toISOString()
+    };
+    try {
+      await store.setJSON(reportId, report);
+    } catch (e) {
+      return http.fail(500, 'report_save_failed', 'The report was generated but could not be saved: ' + e.message);
+    }
+    return http.json(200, { success: true, report: report });
+  }
+
   // ---- create --------------------------------------------------------------
   if (action === 'create') {
     const title = String(payload.title || '').trim() || 'Untitled report';
@@ -186,7 +241,7 @@ async function handleRequest(event) {
         const encodedId = http.safeKey(item.key.slice(0, sepIndex)) + '::' + item.key.slice(sepIndex + 2);
         const rec = await store.get(encodedId, { type: 'json' });
         if (rec) {
-          summaries.push({ id: rec.id, title: rec.title, itemCount: rec.items.length, createdAt: rec.createdAt });
+          summaries.push({ id: rec.id, title: rec.title, itemCount: Array.isArray(rec.items) ? rec.items.length : 0, createdAt: rec.createdAt });
         }
       }
       summaries.sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
@@ -370,14 +425,20 @@ function buildKeywordAppendix(items) {
 
 async function generateExecutiveSummary(provider, apiKey, model, title, items) {
   const systemPrompt =
-    'You are compiling an executive summary across several already-completed pieces of YouTube research (niche scans, ' +
-    'video analyses, channel analyses, or script reviews). Every item already has its own real evidence and score — you are ' +
-    'synthesizing ACROSS them, not re-analyzing any one of them, and must never invent a number not already given. ' +
+    'You are the presentation strategist for a premium market-intelligence report. You are turning one or more already-completed ' +
+    'research runs (niche scans, video analyses, channel analyses, competitor analyses, or transcript playbooks) into a decisive, ' +
+    'Gamma-style narrative. Every item already has real evidence and analysis — organize and explain it, never invent a number. ' +
     'Respond with STRICT JSON only, no markdown fences, matching exactly: ' +
-    '{"overview":string,"rankedItems":[{"query":string,"reason":string}],"crossCuttingThemes":[string,string],' +
+    '{"overview":string,"verdict":{"label":"GO"|"CONDITIONAL GO"|"WATCH"|"NO-GO","reason":string},' +
+    '"marketOpportunity":string,"audienceInsight":string,"keyRisks":[string,string,string],' +
+    '"rankedItems":[{"query":string,"reason":string}],"crossCuttingThemes":[string,string],' +
     '"recommendedNextActions":[string,string,string],' +
+    '"next30Days":[{"phase":string,"action":string,"successMeasure":string}],' +
     '"monetizationRoadmap":[{"query":string,"angle":string,"sequencing":string}],' +
     '"contentCalendar":[{"query":string,"dayOffset":number,"format":"Short"|"Long-form","rationale":string}]}. ' +
+    '"overview" is a sharp 2-3 sentence executive opening, not filler. "verdict" gives a realistic decision and evidence-based reason. ' +
+    '"marketOpportunity" explains the strongest opening; "audienceInsight" states the clearest audience need visible in the supplied findings. ' +
+    '"keyRisks" lists three concrete risks. "next30Days" contains 3-5 sequenced phases with a measurable success signal. ' +
     '"rankedItems" must list the included items in the order you\u2019d prioritize acting on them, citing each one\u2019s real score in "reason". ' +
     '"crossCuttingThemes" are patterns visible across multiple items (shared content gaps, recurring monetization angles, etc.) — ' +
     'only include a theme if it genuinely shows up in two or more items. ' +
@@ -485,6 +546,15 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
 
   if (!Array.isArray(parsed.crossCuttingThemes)) parsed.crossCuttingThemes = [];
   if (!Array.isArray(parsed.recommendedNextActions)) parsed.recommendedNextActions = [];
+  if (!parsed.verdict || typeof parsed.verdict !== 'object') parsed.verdict = { label: 'WATCH', reason: parsed.overview };
+  if (['GO', 'CONDITIONAL GO', 'WATCH', 'NO-GO'].indexOf(parsed.verdict.label) === -1) parsed.verdict.label = 'WATCH';
+  parsed.verdict.reason = typeof parsed.verdict.reason === 'string' ? parsed.verdict.reason : parsed.overview;
+  parsed.marketOpportunity = typeof parsed.marketOpportunity === 'string' ? parsed.marketOpportunity : parsed.overview;
+  parsed.audienceInsight = typeof parsed.audienceInsight === 'string' ? parsed.audienceInsight : '';
+  parsed.keyRisks = Array.isArray(parsed.keyRisks) ? parsed.keyRisks.filter(function (v) { return typeof v === 'string'; }).slice(0, 5) : [];
+  parsed.next30Days = Array.isArray(parsed.next30Days) ? parsed.next30Days.filter(function (v) { return v && typeof v.action === 'string'; }).map(function (v) {
+    return { phase: typeof v.phase === 'string' ? v.phase : 'Next', action: v.action, successMeasure: typeof v.successMeasure === 'string' ? v.successMeasure : '' };
+  }).slice(0, 6) : [];
 
   // These two fields are new and have a stricter shape (numbers, an enum)
   // that smaller/faster models don't always honor exactly — validate and
