@@ -16,6 +16,20 @@ const MAX_ITEMS_PER_REPORT = 12;
 const MAX_LIST = 50;
 
 exports.handler = async function (event) {
+  // Top-level safety net: any uncaught exception anywhere below this point
+  // (including in a required module) would otherwise reach the caller as
+  // Netlify's own raw Lambda crash JSON, which doesn't match this API's
+  // {success, error} shape — the frontend has no clean message to show and
+  // falls back to a generic one. This turns that failure mode into a real,
+  // diagnosable error response instead.
+  try {
+    return await handleRequest(event);
+  } catch (e) {
+    return http.fail(500, 'unexpected_error', 'Something went wrong generating or loading the report: ' + e.message);
+  }
+};
+
+async function handleRequest(event) {
   connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
@@ -100,12 +114,26 @@ exports.handler = async function (event) {
     }
 
     // Full outlines for the top 3 items per the AI's own priority ranking —
-    // not just the title chips each item already had.
-    const topItemOutlines = await generateTopItemOutlines(aiProvider, aiApiKey, aiModel, items, executiveSummary.rankedItems);
+    // not just the title chips each item already had. The executive summary
+    // has already succeeded by this point, so a failure in any one of these
+    // three enrichment steps degrades that section rather than losing the
+    // whole report — this is exactly the class of bug that once made the
+    // entire report generation fail silently (see git history).
+    let topItemOutlines = [];
+    try {
+      topItemOutlines = await generateTopItemOutlines(aiProvider, aiApiKey, aiModel, items, executiveSummary.rankedItems);
+    } catch (e) {
+      topItemOutlines = [];
+    }
 
-    // Pure data aggregation — no AI involved in either of these.
-    const competitiveLandscape = buildCompetitiveLandscape(items);
-    const keywordAppendix = buildKeywordAppendix(items);
+    let competitiveLandscape = { topChannels: [], breakoutVideos: [] };
+    let keywordAppendix = [];
+    try {
+      competitiveLandscape = buildCompetitiveLandscape(items);
+      keywordAppendix = buildKeywordAppendix(items);
+    } catch (e) {
+      // leave the safe empty defaults above
+    }
 
     // Store a self-contained snapshot of each item — a report should still
     // make sense even if the original History entry is later deleted.
@@ -198,7 +226,7 @@ exports.handler = async function (event) {
   }
 
   return http.fail(400, 'unknown_action', 'Unknown action: ' + action);
-};
+}
 
 // ===========================================================================
 // AI executive summary — synthesizes across multiple items, grounded only

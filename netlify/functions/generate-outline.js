@@ -158,3 +158,15 @@ function throwIfBad(res, provider) {
 }
 
 module.exports.callAiForOutline = callAiForOutline;
+
+function buildOutlineSystemPrompt() {
+  return (
+    'You are a video-scripting assistant. You will be given ONE title the creator has chosen, plus real YouTube ' +
+    'evidence about that niche. Produce a practical video outline grounded in that evidence — do not invent new ' +
+    'statistics. Respond with STRICT JSON only, no markdown fences, matching this shape exactly: ' +
+    '{"hook":string,"suggestedLengthMinutes":number,"sections":[{"title":string,"points":[string,string]}],"callToAction":string}. ' +
+    'Produce 4-6 sections. "suggestedLengthMinutes" should be a reasonable estimate for this format/niche (a whole number). ' +
+    '"hook" is the first 10-15 seconds of spoken script, written to be read aloud, not a description of a hook.'
+  );
+}
+module.exports.buildOutlineSystemPrompt = buildOutlineSystemPrompt;
