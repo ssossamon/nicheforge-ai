@@ -231,11 +231,14 @@ function pickSeedTitle(rec) {
 
 async function generateTopItemOutlines(provider, apiKey, model, items, rankedItems) {
   // Follow the AI's own priority order when we have one; otherwise just
-  // take the items in the order they were selected.
-  const orderedQueries = (rankedItems || []).map(function (r) { return r.query; });
+  // take the items in the order they were selected. Matching is
+  // case/whitespace-insensitive since the AI sometimes paraphrases a query
+  // slightly rather than echoing it back verbatim.
+  function normalizeQuery(q) { return String(q || '').trim().toLowerCase(); }
+  const orderedQueries = (rankedItems || []).map(function (r) { return normalizeQuery(r.query); });
   const ordered = items.slice().sort(function (a, b) {
-    const ia = orderedQueries.indexOf(a.query);
-    const ib = orderedQueries.indexOf(b.query);
+    const ia = orderedQueries.indexOf(normalizeQuery(a.query));
+    const ib = orderedQueries.indexOf(normalizeQuery(b.query));
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
   });
 
@@ -441,10 +444,43 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
     throw err;
   }
   if (!Array.isArray(parsed.rankedItems)) parsed.rankedItems = [];
+  parsed.rankedItems = parsed.rankedItems
+    .filter(function (e) { return e && typeof e.query === 'string'; })
+    .map(function (e) { return { query: e.query, reason: typeof e.reason === 'string' ? e.reason : '' }; });
+
   if (!Array.isArray(parsed.crossCuttingThemes)) parsed.crossCuttingThemes = [];
   if (!Array.isArray(parsed.recommendedNextActions)) parsed.recommendedNextActions = [];
-  if (!Array.isArray(parsed.monetizationRoadmap)) parsed.monetizationRoadmap = [];
-  if (!Array.isArray(parsed.contentCalendar)) parsed.contentCalendar = [];
+
+  // These two fields are new and have a stricter shape (numbers, an enum)
+  // that smaller/faster models don't always honor exactly — validate and
+  // coerce rather than trusting the AI's typing, so a string "0" or a
+  // slightly-off format value can't silently break the calendar/roadmap.
+  parsed.monetizationRoadmap = Array.isArray(parsed.monetizationRoadmap)
+    ? parsed.monetizationRoadmap
+        .filter(function (e) { return e && typeof e.query === 'string'; })
+        .map(function (e) {
+          return {
+            query: e.query,
+            angle: typeof e.angle === 'string' ? e.angle : '',
+            sequencing: typeof e.sequencing === 'string' ? e.sequencing : ''
+          };
+        })
+    : [];
+
+  parsed.contentCalendar = Array.isArray(parsed.contentCalendar)
+    ? parsed.contentCalendar
+        .filter(function (e) { return e && typeof e.query === 'string'; })
+        .map(function (e) {
+          const parsedOffset = typeof e.dayOffset === 'number' && isFinite(e.dayOffset) ? e.dayOffset : parseInt(e.dayOffset, 10);
+          return {
+            query: e.query,
+            dayOffset: isFinite(parsedOffset) ? Math.max(0, Math.round(parsedOffset)) : 0,
+            format: e.format === 'Short' ? 'Short' : 'Long-form',
+            rationale: typeof e.rationale === 'string' ? e.rationale : ''
+          };
+        })
+    : [];
+
   return parsed;
 }
 
