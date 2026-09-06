@@ -79,28 +79,39 @@ without touching Netlify's dashboard, and later lets any buyer optionally
 supply their own quota). Every scan result now labels which key served it
 ("using your own YouTube key" vs "using the app's shared YouTube key").
 
-## Known limitation: Blobs is eventually consistent
+## Fixed bugs worth knowing about (v1.3.1–v1.3.6)
 
-All persisted data (leads, licenses, usage counts, history, watchlist, the
-scan cache) lives in Netlify Blobs, which by default takes **up to 60
-seconds** to propagate a write to all read locations (Netlify's own
-documented figure). In practice this means: add something to History or the
-Watchlist, and it may not appear in the very next request — refreshing the
-panel a little later will show it.
+Three real, previously-invisible production bugs were found and fixed while
+building History/Watchlist. Worth understanding since they explain some
+behavior you'll still see:
 
-We looked into requesting `consistency: 'strong'` for immediate read-after-
-write, but that mode requires an `uncachedEdgeURL` in the runtime context
-that `connectLambda()` (required for classic Netlify Functions) doesn't
-provide — fixing that properly would mean switching to direct
-Netlify-API-token access just for this, which is more infrastructure than
-this single-user tool needs. Eventual consistency is an accepted trade-off
-here, not a bug we missed.
+**1. Blobs wasn't connecting at all (fixed).** Classic Netlify Functions
+(`exports.handler`) run in "Lambda compatibility mode," where `@netlify/blobs`
+does NOT get its context auto-injected. Every function that touches storage
+now calls `connectLambda(event)` first — without it, every read/write
+silently failed with `MissingBlobsEnvironmentError`, meaning leads/licenses
+may not have saved at all before this fix.
 
-Separately: every Blobs-using function now calls `connectLambda(event)`
-before touching a store. Without it, Blobs silently fails with
-`MissingBlobsEnvironmentError` in production — this was broken from the
-very first deploy and is why leads/licenses may not have been saving before
-this fix.
+**2. `list()` returns keys in raw/decoded form, but `get()` needs the exact
+encoded string used at write time (fixed).** Any key built from an email or
+topic (which contain `@`, spaces, etc.) is now URL-encoded via `http.safeKey()`
+before being used to `set`/`get`/`delete`. But `store.list()` always hands
+back the *decoded* key regardless of how it was written — so every place that
+lists keys and then re-fetches by `item.key` (History, Watchlist, the
+scheduled recheck, admin lead export) now re-derives the correctly-encoded
+key from the raw one `list()` returns, rather than using `item.key` directly.
+This was a genuine gap in how the two operations represent the same key, not
+a mistake in our original key design.
+
+**3. Blobs is eventually consistent, up to 60 seconds (accepted, not a bug).**
+Netlify's own documented figure for write/delete propagation. In practice:
+add or remove something in History/Watchlist and it may not reflect in the
+very next request — it'll show up (or disappear) within about a minute.
+`consistency: 'strong'` would fix this, but it requires an `uncachedEdgeURL`
+that `connectLambda()`'s context doesn't provide — getting it would mean
+switching to direct Netlify-API-token access just for this, which is more
+infrastructure than a single-user tool needs.
+
 
 ## v1.3 — history, real comments, monetization angles, outlines, watchlist
 
