@@ -193,6 +193,7 @@
       <a href="javascript:void(0)" id="nav-settings-link">Settings</a>
       <a href="javascript:void(0)" id="nav-history-link">History</a>
       <a href="javascript:void(0)" id="nav-watchlist-link">Watchlist</a>
+      <a href="javascript:void(0)" id="nav-reports-link">Reports</a>
     </div>
     <a class="navcta" href="#scan">Run a free scan</a>
   </div>
@@ -496,6 +497,45 @@
     <p class="muted-lo" style="font-size:13px;">Rechecked automatically once a day using real YouTube data. Flagged topics moved 10+ points or picked up a new breakout video since the last check.</p>
     <div id="watchlist-modal-body"><p class="muted-lo">Loading…</p></div>
     <button class="btn btn-ghost" id="btn-close-watchlist-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="reports-modal">
+  <div class="modal" style="max-width:620px;max-height:85vh;overflow-y:auto;">
+    <h3>Reports</h3>
+    <p class="muted-lo" style="font-size:13px;">Compile several History items into one consolidated report with an AI executive summary tying them together — grounded only in each item's real, already-computed score.</p>
+
+    <div style="display:flex;gap:8px;margin:14px 0;">
+      <button class="btn btn-ghost" id="reports-tab-build" type="button" style="flex:1;background:var(--ink);color:#fff;font-size:13px;">Build new report</button>
+      <button class="btn btn-ghost" id="reports-tab-list" type="button" style="flex:1;font-size:13px;">My reports</button>
+    </div>
+
+    <div id="reports-build-view">
+      <div class="field">
+        <label for="report-title">Report title</label>
+        <input type="text" id="report-title" placeholder="e.g. Q1 coffee niche research" />
+      </div>
+      <div class="muted-lo" style="font-size:13px;margin:10px 0 6px;"><b>Select History items to include (up to 12):</b></div>
+      <div id="reports-history-picker"><p class="muted-lo">Loading…</p></div>
+      <button class="btn btn-primary" id="btn-generate-report" type="button" style="margin-top:14px;width:auto;">Generate report</button>
+      <div id="report-generate-status" class="status-line"></div>
+    </div>
+
+    <div id="reports-list-view" style="display:none;">
+      <div id="reports-list-body"><p class="muted-lo">Loading…</p></div>
+    </div>
+
+    <button class="btn btn-ghost" id="btn-close-reports-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="report-view-modal">
+  <div class="modal" style="max-width:640px;max-height:85vh;overflow-y:auto;">
+    <div id="report-view-body">Loading…</div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-ghost" id="btn-export-report-pdf" type="button">Export PDF</button>
+      <button class="btn btn-ghost" id="btn-close-report-view-modal" type="button">Close</button>
+    </div>
   </div>
 </div>
 
@@ -1667,6 +1707,308 @@ function generateOutline(result, titleIdea) {
 
 el('btn-close-outline-modal').addEventListener('click', function () {
   el('outline-modal').className = 'modal-veil';
+});
+
+// ---- Reports module ---------------------------------------------------
+
+var CURRENT_REPORT = null;
+
+el('nav-reports-link').addEventListener('click', function () {
+  el('reports-modal').className = 'modal-veil open';
+  showReportsTab('build');
+});
+el('btn-close-reports-modal').addEventListener('click', function () {
+  el('reports-modal').className = 'modal-veil';
+});
+el('reports-tab-build').addEventListener('click', function () { showReportsTab('build'); });
+el('reports-tab-list').addEventListener('click', function () { showReportsTab('list'); });
+
+function showReportsTab(tab) {
+  var buildBtn = el('reports-tab-build');
+  var listBtn = el('reports-tab-list');
+  if (tab === 'build') {
+    el('reports-build-view').style.display = 'block';
+    el('reports-list-view').style.display = 'none';
+    buildBtn.style.background = 'var(--ink)';
+    buildBtn.style.color = '#fff';
+    listBtn.style.background = 'transparent';
+    listBtn.style.color = 'var(--brass-dim)';
+    loadHistoryPickerForReports();
+  } else {
+    el('reports-build-view').style.display = 'none';
+    el('reports-list-view').style.display = 'block';
+    listBtn.style.background = 'var(--ink)';
+    listBtn.style.color = '#fff';
+    buildBtn.style.background = 'transparent';
+    buildBtn.style.color = 'var(--brass-dim)';
+    loadReportsList();
+  }
+}
+
+function contentTypeLabel(t) {
+  if (t === 'video') return 'Video';
+  if (t === 'channel') return 'Channel';
+  if (t === 'transcript') return 'Script';
+  return 'Niche';
+}
+
+function loadHistoryPickerForReports() {
+  var email = lsGet('email');
+  var picker = el('reports-history-picker');
+  if (!email) {
+    picker.innerHTML = '<p class="muted-lo">Run a scan or analysis first — reports are built from your History.</p>';
+    return;
+  }
+  picker.innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.history.length === 0) {
+        picker.innerHTML = '<p class="muted-lo">No History items yet. Run a scan or analysis first.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.history.length; i++) {
+        var h = data.history[i];
+        html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line-paper);font-size:13.5px;">';
+        html += '<input type="checkbox" class="report-item-checkbox" value="' + escapeHtml(h.id) + '" style="width:auto;" />';
+        html += '<span style="flex:1;">[' + contentTypeLabel(h.contentType) + '] ' + escapeHtml(h.query) + '</span>';
+        html += '<span class="muted-lo">score ' + (h.score === null ? 'n/a' : h.score) + '</span>';
+        html += '</label>';
+      }
+      picker.innerHTML = html;
+    })
+    .catch(function (e) {
+      picker.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('btn-generate-report').addEventListener('click', function () {
+  var email = lsGet('email');
+  var title = el('report-title').value.trim();
+  var checkboxes = document.querySelectorAll('.report-item-checkbox:checked');
+  var historyIds = [];
+  for (var i = 0; i < checkboxes.length; i++) historyIds.push(checkboxes[i].value);
+
+  var statusEl = el('report-generate-status');
+  if (!title) {
+    statusEl.className = 'status-line status-bad';
+    statusEl.textContent = 'Give the report a title.';
+    return;
+  }
+  if (historyIds.length === 0) {
+    statusEl.className = 'status-line status-bad';
+    statusEl.textContent = 'Select at least one History item.';
+    return;
+  }
+  if (!lsGet('ai_key')) {
+    el('reports-modal').className = 'modal-veil';
+    openSettingsModal();
+    return;
+  }
+
+  var btn = el('btn-generate-report');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  statusEl.className = 'status-line';
+  statusEl.textContent = '';
+
+  fetch('/api/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'create',
+      email: email,
+      title: title,
+      historyIds: historyIds,
+      aiProvider: lsGet('ai_provider') || 'openai',
+      aiApiKey: lsGet('ai_key') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      btn.disabled = false;
+      btn.textContent = 'Generate report';
+      if (!data.success) {
+        statusEl.className = 'status-line status-bad';
+        statusEl.textContent = data.error ? data.error.message : 'Could not generate the report.';
+        return;
+      }
+      statusEl.textContent = '';
+      el('reports-modal').className = 'modal-veil';
+      openReportView(data.report);
+    })
+    .catch(function (e) {
+      btn.disabled = false;
+      btn.textContent = 'Generate report';
+      statusEl.className = 'status-line status-bad';
+      statusEl.textContent = 'Network error: ' + e.message;
+    });
+});
+
+function loadReportsList() {
+  var email = lsGet('email');
+  var body = el('reports-list-body');
+  if (!email) {
+    body.innerHTML = '<p class="muted-lo">Run a scan first.</p>';
+    return;
+  }
+  body.innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.reports.length === 0) {
+        body.innerHTML = '<p class="muted-lo">No reports yet.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.reports.length; i++) {
+        var r = data.reports[i];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-paper);padding:10px 0;">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(r.title) + '</b><div class="muted-lo" style="font-size:12px;">' + r.itemCount + ' items \u00B7 ' + new Date(r.createdAt).toLocaleString() + '</div></div>';
+        html += '<div style="display:flex;gap:6px;"><button class="btn btn-ghost report-open-btn" data-id="' + escapeHtml(r.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Open</button>';
+        html += '<button class="btn btn-ghost report-delete-btn" data-id="' + escapeHtml(r.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Delete</button></div>';
+        html += '</div>';
+      }
+      body.innerHTML = html;
+    })
+    .catch(function (e) {
+      body.innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('reports-list-body').addEventListener('click', function (e) {
+  var target = e.target;
+  var email = lsGet('email');
+  if (target.classList.contains('report-open-btn')) {
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get', email: email, id: target.getAttribute('data-id') })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) { alert(data.error ? data.error.message : 'Could not open that report.'); return; }
+        el('reports-modal').className = 'modal-veil';
+        openReportView(data.report);
+      });
+  }
+  if (target.classList.contains('report-delete-btn')) {
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', email: email, id: target.getAttribute('data-id') })
+    }).then(function () { loadReportsList(); });
+  }
+});
+
+function openReportView(report) {
+  CURRENT_REPORT = report;
+  var s = report.executiveSummary;
+  var html = '<h3 style="margin-bottom:2px;">' + escapeHtml(report.title) + '</h3>';
+  html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:16px;">' + report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleString() + '</div>';
+  html += '<div class="opp"><h4>Overview</h4><p>' + escapeHtml(s.overview) + '</p></div>';
+  if (s.rankedItems && s.rankedItems.length) {
+    html += '<div class="opp"><h4>Priority order</h4><ol style="margin:0;padding-left:20px;font-size:14px;">';
+    for (var i = 0; i < s.rankedItems.length; i++) {
+      html += '<li><b>' + escapeHtml(s.rankedItems[i].query) + '</b> \u2014 ' + escapeHtml(s.rankedItems[i].reason) + '</li>';
+    }
+    html += '</ol></div>';
+  }
+  if (s.crossCuttingThemes && s.crossCuttingThemes.length) {
+    html += '<div class="opp"><h4>Cross-cutting themes</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
+    for (var t = 0; t < s.crossCuttingThemes.length; t++) html += '<li>' + escapeHtml(s.crossCuttingThemes[t]) + '</li>';
+    html += '</ul></div>';
+  }
+  if (s.recommendedNextActions && s.recommendedNextActions.length) {
+    html += '<div class="opp"><h4>Recommended next actions</h4><ul style="margin:0;padding-left:18px;font-size:14px;">';
+    for (var n = 0; n < s.recommendedNextActions.length; n++) html += '<li>' + escapeHtml(s.recommendedNextActions[n]) + '</li>';
+    html += '</ul></div>';
+  }
+  html += '<div style="margin-top:16px;border-top:1px solid var(--line-paper);padding-top:12px;">';
+  html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Included items</b></div>';
+  for (var j = 0; j < report.items.length; j++) {
+    var it = report.items[j];
+    html += '<div style="font-size:13.5px;padding:6px 0;border-top:1px solid var(--line-paper);">[' + contentTypeLabel(it.contentType) + '] ' + escapeHtml(it.query) + ' \u2014 score ' + (it.score === null ? 'n/a' : it.score) + '</div>';
+  }
+  html += '</div>';
+  el('report-view-body').innerHTML = html;
+  el('report-view-modal').className = 'modal-veil open';
+}
+
+el('btn-close-report-view-modal').addEventListener('click', function () {
+  el('report-view-modal').className = 'modal-veil';
+});
+
+el('btn-export-report-pdf').addEventListener('click', function () {
+  if (!CURRENT_REPORT) return;
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFCtor) { alert('PDF library did not load. Check your internet connection and try again.'); return; }
+
+  var report = CURRENT_REPORT;
+  var s = report.executiveSummary;
+  var doc = new jsPDFCtor({ unit: 'pt', format: 'letter' });
+  var margin = 48;
+  var y = margin;
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var maxWidth = pageWidth - margin * 2;
+
+  function addLine(text, size, style, gap) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style || 'normal');
+    var lines = doc.splitTextToSize(text, maxWidth);
+    for (var i = 0; i < lines.length; i++) {
+      if (y > 740) { doc.addPage(); y = margin; }
+      doc.text(lines[i], margin, y);
+      y += size * 1.3;
+    }
+    y += gap || 4;
+  }
+
+  addLine('NicheForge AI Report', 12, 'italic', 2);
+  addLine(report.title, 20, 'bold', 4);
+  addLine(report.items.length + ' items \u00B7 generated ' + new Date(report.createdAt).toLocaleDateString(), 10, 'normal', 14);
+
+  addLine('Overview', 13, 'bold', 4);
+  addLine(s.overview, 10, 'normal', 12);
+
+  if (s.rankedItems && s.rankedItems.length) {
+    addLine('Priority order', 13, 'bold', 4);
+    for (var i = 0; i < s.rankedItems.length; i++) {
+      addLine((i + 1) + '. ' + s.rankedItems[i].query + ' \u2014 ' + s.rankedItems[i].reason, 10, 'normal', 4);
+    }
+    y += 8;
+  }
+
+  if (s.crossCuttingThemes && s.crossCuttingThemes.length) {
+    addLine('Cross-cutting themes', 13, 'bold', 4);
+    for (var t = 0; t < s.crossCuttingThemes.length; t++) addLine('\u2022 ' + s.crossCuttingThemes[t], 10, 'normal', 3);
+    y += 8;
+  }
+
+  if (s.recommendedNextActions && s.recommendedNextActions.length) {
+    addLine('Recommended next actions', 13, 'bold', 4);
+    for (var n = 0; n < s.recommendedNextActions.length; n++) addLine((n + 1) + '. ' + s.recommendedNextActions[n], 10, 'normal', 3);
+    y += 8;
+  }
+
+  addLine('Included items', 13, 'bold', 6);
+  for (var j = 0; j < report.items.length; j++) {
+    var it = report.items[j];
+    addLine('[' + contentTypeLabel(it.contentType) + '] ' + it.query + ' \u2014 score ' + (it.score === null ? 'n/a' : it.score), 10, 'bold', 2);
+  }
+
+  addLine('Generated by NicheForge AI', 8, 'italic', 0);
+
+  doc.save('nicheforge-report-' + report.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) + '.pdf');
 });
 
 </script>

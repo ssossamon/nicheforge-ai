@@ -51,7 +51,7 @@ exports.handler = async function (event) {
         const encodedId = http.safeKey(item.key.slice(0, sepIndex)) + '::' + item.key.slice(sepIndex + 2);
         const rec = await store.get(encodedId, { type: 'json' });
         if (rec) {
-          summaries.push({ id: rec.id, query: rec.query, opportunityScore: rec.opportunityScore, avgViews: rec.avgViews, timestamp: rec.timestamp });
+          summaries.push({ id: rec.id, contentType: rec.contentType || 'niche', query: rec.query, score: rec.score !== undefined ? rec.score : rec.opportunityScore, avgViews: rec.avgViews, timestamp: rec.timestamp });
         }
       }
       summaries.sort(function (a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });

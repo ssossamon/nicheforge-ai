@@ -5,11 +5,13 @@
 // evidence (or an honest note when there is none) plus a deterministic
 // score and BYOK AI analysis grounded in that evidence.
 
+const { connectLambda } = require('@netlify/blobs');
 const http = require('./_shared/http');
 const contentAnalysis = require('./_shared/content-analysis');
 const core = require('./_shared/scan-core');
 
 exports.handler = async function (event) {
+  connectLambda(event);
   if (http.isPreflight(event)) return http.preflightResponse();
   if (event.httpMethod !== 'POST') {
     return http.fail(405, 'method_not_allowed', 'This endpoint only accepts POST requests.');
@@ -23,6 +25,7 @@ exports.handler = async function (event) {
   }
 
   const input = String(payload.input || '').trim();
+  const email = String(payload.email || '').trim().toLowerCase();
   const aiProvider = String(payload.aiProvider || '').trim().toLowerCase();
   const aiApiKey = String(payload.aiApiKey || '').trim();
   const aiModel = payload.aiModel ? String(payload.aiModel).trim() : '';
@@ -30,6 +33,9 @@ exports.handler = async function (event) {
 
   if (!input) {
     return http.fail(400, 'missing_input', 'Paste a YouTube video URL, channel URL, or transcript text.');
+  }
+  if (!http.validEmail(email)) {
+    return http.fail(400, 'missing_email', 'A valid email is required.');
   }
   if (!aiProvider || !aiApiKey) {
     return http.fail(400, 'missing_ai_key', 'Add your AI provider and key in Settings first.');
@@ -68,7 +74,7 @@ exports.handler = async function (event) {
       return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message, e.whatToDoNext, e.rawResponse ? { _diagnostics: { rawAiResponse: e.rawResponse } } : undefined);
     }
 
-    return http.json(200, { success: true, contentType: 'video', evidence: evidence, ai: ai });
+    return http.json(200, { success: true, contentType: 'video', evidence: evidence, ai: ai, historyId: await core.saveToHistory(email, evidence.title, evidence, ai, 'video') });
   }
 
   // ---- Channel URL ---------------------------------------------------------
@@ -100,7 +106,7 @@ exports.handler = async function (event) {
       return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message, e.whatToDoNext, e.rawResponse ? { _diagnostics: { rawAiResponse: e.rawResponse } } : undefined);
     }
 
-    return http.json(200, { success: true, contentType: 'channel', evidence: evidence, ai: ai });
+    return http.json(200, { success: true, contentType: 'channel', evidence: evidence, ai: ai, historyId: await core.saveToHistory(email, evidence.title, evidence, ai, 'channel') });
   }
 
   // ---- Raw transcript / script text ---------------------------------------
@@ -111,15 +117,18 @@ exports.handler = async function (event) {
     } catch (e) {
       return http.fail(e.statusCode || 502, e.code || 'ai_call_failed', e.message, e.whatToDoNext, e.rawResponse ? { _diagnostics: { rawAiResponse: e.rawResponse } } : undefined);
     }
+    const transcriptEvidence = {
+      characterCount: detected.text.length,
+      wordCount: detected.text.split(/\s+/).filter(Boolean).length,
+      note: 'No real YouTube data exists for pasted text — everything below is an AI assessment, not a measured performance metric.'
+    };
+    const transcriptTitle = 'Pasted script: ' + detected.text.slice(0, 60).trim() + (detected.text.length > 60 ? '…' : '');
     return http.json(200, {
       success: true,
       contentType: 'transcript',
-      evidence: {
-        characterCount: detected.text.length,
-        wordCount: detected.text.split(/\s+/).filter(Boolean).length,
-        note: 'No real YouTube data exists for pasted text — everything below is an AI assessment, not a measured performance metric.'
-      },
-      ai: ai
+      evidence: transcriptEvidence,
+      ai: ai,
+      historyId: await core.saveToHistory(email, transcriptTitle, transcriptEvidence, ai, 'transcript')
     });
   }
 

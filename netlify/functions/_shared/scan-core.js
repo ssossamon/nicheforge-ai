@@ -534,16 +534,25 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
 // away. Keyed by email so each person's history stays separate.
 // ===========================================================================
 
-async function saveToHistory(email, query, evidence, ai) {
+async function saveToHistory(email, query, evidence, ai, contentType) {
   try {
     const store = getStore('nforge-history');
     const id = encodeURIComponent(email) + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
+    const type = contentType || 'niche';
+    // Normalize whichever score field this content type uses (each type has
+    // its own name/formula) into one field reports can sort/compare on.
+    const normalizedScore =
+      evidence.opportunityScore !== undefined ? evidence.opportunityScore :
+      evidence.videoPerformanceScore !== undefined ? evidence.videoPerformanceScore :
+      evidence.channelHealthScore !== undefined ? evidence.channelHealthScore :
+      (ai && ai.scriptQualityScore !== undefined) ? ai.scriptQualityScore : null;
     await store.setJSON(id, {
       id: id,
       email: email,
+      contentType: type,
       query: query,
-      opportunityScore: evidence.opportunityScore,
-      avgViews: evidence.avgViews,
+      score: normalizedScore,
+      avgViews: evidence.avgViews !== undefined ? evidence.avgViews : (evidence.views !== undefined ? evidence.views : null),
       timestamp: new Date().toISOString(),
       evidence: evidence,
       ai: ai

@@ -113,6 +113,33 @@ switching to direct Netlify-API-token access just for this, which is more
 infrastructure than a single-user tool needs.
 
 
+## v1.5 — Reports module
+
+A new "Reports" nav link compiles multiple History items (any mix of niche
+scans, video analyses, channel analyses, transcript reviews) into one named,
+persisted report (`netlify/functions/reports.js`, `nforge-reports` store):
+
+- **Build a report**: check off up to 12 History items, give it a title,
+  generate. An AI executive summary ties them together — a priority-ranked
+  list citing each item's real score, cross-cutting themes that genuinely
+  appear in 2+ items, and recommended next actions. The AI is only ever
+  shown each item's already-computed score/evidence and is instructed never
+  to invent a new number.
+- **My reports**: list, reopen, or delete saved reports. Each report is a
+  self-contained snapshot (it embeds the items' data at generation time), so
+  it stays intact even if the original History entries are later deleted.
+- **Export PDF**: a full report — overview, priority order, themes, next
+  actions, and the item list — exports client-side via the same jsPDF setup
+  as single-dossier exports.
+
+This also required generalizing History itself: it previously only saved
+niche scans. `saveToHistory()` now takes a `contentType` and normalizes
+whichever score field a given content type uses (Opportunity/Video
+Performance/Channel Health/Script Quality) into one `score` field, and
+`analyze-content.js` now saves every video/channel/transcript analysis to
+History too (it previously didn't save anything, and was also missing the
+`connectLambda()` call it now needs).
+
 ## v1.4 — content analyzer: video/channel URLs, Shorts, transcripts
 
 A third "Analyze URL" tab accepts a pasted YouTube video URL (including
