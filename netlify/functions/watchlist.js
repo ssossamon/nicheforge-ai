@@ -98,6 +98,27 @@ exports.handler = async function (event) {
     }
   }
 
+  if (action === 'diag') {
+    const out = {};
+    try {
+      out.writeResult = await store.setJSON(key, { email: email, query: query, marker: 'diag-write', addedAt: new Date().toISOString() });
+    } catch (e) { out.writeError = e.message; }
+    try {
+      out.listNoPrefix = (await store.list()).blobs;
+    } catch (e) { out.listNoPrefixError = e.message; }
+    try {
+      out.listWithPrefix = (await store.list({ prefix: keyPrefix })).blobs;
+    } catch (e) { out.listWithPrefixError = e.message; }
+    try {
+      out.directGetTyped = await store.get(key, { type: 'json' });
+    } catch (e) { out.directGetTypedError = e.message; }
+    try {
+      out.directGetRaw = await store.get(key);
+    } catch (e) { out.directGetRawError = e.message; }
+    out.key = key;
+    out.keyPrefix = keyPrefix;
+    return http.json(200, { success: true, diag: out });
+  }
 
   return http.fail(400, 'unknown_action', 'Unknown action: ' + action);
 };
