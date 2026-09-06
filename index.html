@@ -190,6 +190,7 @@
       <a href="#evidence">Why trust the data</a>
       <a href="#pricing">Pricing</a>
       <a href="#license">Activate license</a>
+      <a href="javascript:void(0)" id="nav-settings-link">Settings</a>
     </div>
     <a class="navcta" href="#scan">Run a free scan</a>
   </div>
@@ -225,20 +226,13 @@
 
       <div class="row2">
         <div class="field">
-          <label for="f-provider">AI provider</label>
-          <select id="f-provider">
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="gemini">Google Gemini</option>
-          </select>
+          <label>AI &amp; data settings</label>
+          <div class="helper" id="settings-status-line">Not configured yet — add your AI key (and optionally your own YouTube key) in Settings.</div>
         </div>
-        <div class="field">
-          <label for="f-key">Your API key</label>
-          <input type="password" id="f-key" placeholder="sk-..." />
+        <div class="field" style="display:flex;align-items:end;">
+          <button class="btn btn-ghost" id="btn-open-settings" type="button" style="width:100%;">Open Settings</button>
         </div>
       </div>
-      <button class="btn btn-ghost" id="btn-test-key" type="button">Test connection</button>
-      <span id="test-key-status" class="status-line"></span>
 
       <div style="margin-top:16px;">
         <button class="btn btn-primary" id="btn-scan" type="button">Run niche scan</button>
@@ -381,7 +375,11 @@
       </div>
       <div class="faqitem">
         <h4>Is my API key stored anywhere?</h4>
-        <p>No. It's kept in your browser's local storage and sent only with each scan request to run that one scan — it's never written to our database.</p>
+        <p>No. Everything in Settings — your AI key and, if you add one, your own YouTube Data API key — is kept in your browser's local storage and sent only with each scan request to run that one scan. Neither is ever written to our database.</p>
+      </div>
+      <div class="faqitem">
+        <h4>Do I need my own YouTube API key?</h4>
+        <p>No — the app uses a shared key by default so most people never touch this. If you want to use your own free Google quota instead (useful for heavy testing), add it in Settings; it's entirely optional.</p>
       </div>
       <div class="faqitem">
         <h4>What exactly is "real" versus "estimated"?</h4>
@@ -414,6 +412,45 @@
   </div>
 </div>
 
+<div class="modal-veil" id="settings-modal">
+  <div class="modal" style="max-width:480px;">
+    <h3>Settings</h3>
+    <p>Stored only in this browser (localStorage) — never sent anywhere except with your own scan requests.</p>
+
+    <div class="field">
+      <label for="s-provider">AI provider</label>
+      <select id="s-provider">
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="s-ai-key">Your AI API key</label>
+      <input type="password" id="s-ai-key" placeholder="sk-..." />
+      <div class="helper">Required. Used to write up each scan's results.</div>
+    </div>
+    <button class="btn btn-ghost" id="btn-test-key" type="button">Test AI connection</button>
+    <span id="test-key-status" class="status-line"></span>
+
+    <div class="field" style="margin-top:18px;border-top:1px solid var(--line-paper);padding-top:16px;">
+      <label for="s-yt-key">Your YouTube Data API key (optional)</label>
+      <input type="text" id="s-yt-key" placeholder="AIza..." />
+      <div class="helper">
+        Leave blank to use the app's shared key. Add your own to use your own free Google quota instead —
+        get one at <a href="javascript:void(0)" id="yt-console-link" style="color:var(--brass-dim);">console.cloud.google.com</a>
+        (New Project → enable "YouTube Data API v3" → Credentials → Create API Key).
+      </div>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:10px;">
+      <button class="btn btn-primary" id="btn-save-settings" style="width:auto;flex:1;">Save settings</button>
+      <button class="btn btn-ghost" id="btn-close-settings" type="button">Close</button>
+    </div>
+    <div id="settings-save-status" class="status-line"></div>
+  </div>
+</div>
+
 <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture" id="paypal-sdk-placeholder"></script>
 <script>
 
@@ -433,14 +470,6 @@ function lsSet(key, val) {
 }
 
 function el(id) { return document.getElementById(id); }
-
-function escapeHtml(str) {
-  var div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
-}
-
-// ---- email gate ------------------------------------------------------
 
 var OWNER_KEY = 'NFORGE-ADM-SCOTT-2026';
 
@@ -475,11 +504,57 @@ function ensureEmail(callback) {
   el('modal-continue').addEventListener('click', handler);
 }
 
-// ---- test AI key -------------------------------------------------------
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+// ---- email gate ------------------------------------------------------
+
+// ---- Settings module (AI key + optional own YouTube key) -----------------
+
+function updateSettingsStatusLine() {
+  var provider = lsGet('ai_provider');
+  var aiKey = lsGet('ai_key');
+  var ytKey = lsGet('youtube_key');
+  var line = el('settings-status-line');
+  if (!aiKey) {
+    line.textContent = 'Not configured yet — add your AI key (and optionally your own YouTube key) in Settings.';
+    return;
+  }
+  var providerLabel = provider === 'anthropic' ? 'Anthropic' : provider === 'gemini' ? 'Gemini' : 'OpenAI';
+  var ytPart = ytKey ? 'using your own YouTube key' : "using the app's shared YouTube data";
+  line.textContent = providerLabel + ' key saved \u00B7 ' + ytPart + '.';
+}
+
+function openSettingsModal() {
+  var provider = lsGet('ai_provider');
+  var aiKey = lsGet('ai_key');
+  var ytKey = lsGet('youtube_key');
+  if (provider) el('s-provider').value = provider;
+  if (aiKey) el('s-ai-key').value = aiKey;
+  if (ytKey) el('s-yt-key').value = ytKey;
+  el('test-key-status').textContent = '';
+  el('settings-save-status').textContent = '';
+  el('settings-modal').className = 'modal-veil open';
+}
+
+function closeSettingsModal() {
+  el('settings-modal').className = 'modal-veil';
+}
+
+el('nav-settings-link').addEventListener('click', openSettingsModal);
+el('btn-open-settings').addEventListener('click', openSettingsModal);
+el('btn-close-settings').addEventListener('click', closeSettingsModal);
+
+el('yt-console-link').addEventListener('click', function () {
+  window.open('https://console.cloud.google.com/projectcreate', '_blank');
+});
 
 el('btn-test-key').addEventListener('click', function () {
-  var provider = el('f-provider').value;
-  var apiKey = el('f-key').value.trim();
+  var provider = el('s-provider').value;
+  var apiKey = el('s-ai-key').value.trim();
   var statusEl = el('test-key-status');
   if (!apiKey) {
     statusEl.className = 'status-line status-bad';
@@ -498,8 +573,6 @@ el('btn-test-key').addEventListener('click', function () {
       if (data.valid) {
         statusEl.className = 'status-line status-ok';
         statusEl.textContent = 'Connected — key works.';
-        lsSet('ai_provider', provider);
-        lsSet('ai_key', apiKey);
       } else {
         statusEl.className = 'status-line status-bad';
         statusEl.textContent = data.reason || (data.error && data.error.message) || 'Connection failed.';
@@ -511,14 +584,30 @@ el('btn-test-key').addEventListener('click', function () {
     });
 });
 
-// restore saved AI provider/key
-(function restoreAiFields() {
-  var savedProvider = lsGet('ai_provider');
-  var savedKey = lsGet('ai_key');
-  if (savedProvider) el('f-provider').value = savedProvider;
-  if (savedKey) el('f-key').value = savedKey;
+el('btn-save-settings').addEventListener('click', function () {
+  var provider = el('s-provider').value;
+  var aiKey = el('s-ai-key').value.trim();
+  var ytKey = el('s-yt-key').value.trim();
+  var statusEl = el('settings-save-status');
+  if (!aiKey) {
+    statusEl.className = 'status-line status-bad';
+    statusEl.textContent = 'An AI API key is required.';
+    return;
+  }
+  lsSet('ai_provider', provider);
+  lsSet('ai_key', aiKey);
+  lsSet('youtube_key', ytKey);
+  updateSettingsStatusLine();
+  statusEl.className = 'status-line status-ok';
+  statusEl.textContent = 'Saved.';
+  setTimeout(closeSettingsModal, 700);
+});
+
+// restore saved email field + settings status line on load
+(function restoreSavedFields() {
   var savedEmail = lsGet('email');
   if (savedEmail) el('f-email').value = savedEmail;
+  updateSettingsStatusLine();
 })();
 
 // ---- run scan ------------------------------------------------------------
@@ -530,17 +619,21 @@ el('btn-scan').addEventListener('click', function () {
     el('scan-status').textContent = 'Enter a topic first.';
     return;
   }
+  if (!lsGet('ai_key')) {
+    openSettingsModal();
+    return;
+  }
   ensureEmail(function (email) {
     doScan(query, email);
   });
 });
 
 function doScan(query, email) {
-  var provider = el('f-provider').value;
-  var apiKey = el('f-key').value.trim();
+  var provider = lsGet('ai_provider') || 'openai';
+  var apiKey = lsGet('ai_key') || '';
+  var youtubeKey = lsGet('youtube_key') || '';
   if (!apiKey) {
-    el('scan-status').className = 'status-line status-bad';
-    el('scan-status').textContent = 'Enter your AI provider API key first.';
+    openSettingsModal();
     return;
   }
 
@@ -568,6 +661,7 @@ function doScan(query, email) {
       email: email,
       aiProvider: provider,
       aiApiKey: apiKey,
+      youtubeApiKey: youtubeKey,
       licenseKey: lsGet('license_key') || ''
     })
   })
@@ -602,7 +696,7 @@ function renderResults(data) {
 
   html += '<div class="dossier">';
   html += '  <div class="dossier-head">';
-  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(data.query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; source: ' + escapeHtml(ev.dataSource) + '</div></div>';
+  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(data.query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; ' + (ev.youtubeKeySource === 'settings' ? 'using your own YouTube key' : "using the app's shared YouTube key") + '</div></div>';
   html += '    <div style="text-align:right;"><div class="score">' + ev.opportunityScore + '</div><div class="muted-lo" style="font-size:12px;">Opportunity Score</div></div>';
   html += '  </div>';
   html += '  <div class="dossier-body">';

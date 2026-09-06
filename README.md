@@ -65,11 +65,22 @@ key.
 - `nforge-usage` — free-scan counters per email: `{count, lastScanAt}`
 - `nforge-scans` — rolling scan log for admin visibility: `{email, query, opportunityScore, timestamp}`
 
+## Settings module (v1.1)
+
+The AI provider/key fields moved out of the scan form into a proper **Settings**
+modal (nav link, or auto-opens when you try to scan with no key saved). It also
+now accepts an **optional personal YouTube Data API key** — leave it blank to
+use the shared `YOUTUBE_API_KEY` you set in Netlify, or add your own to use
+your own free Google quota instead (this is what lets the owner test heavily
+without touching Netlify's dashboard, and later lets any buyer optionally
+supply their own quota). Every scan result now labels which key served it
+("using your own YouTube key" vs "using the app's shared YouTube key").
+
 ## Privacy
 
-- The buyer's AI API key is stored only in their own browser's local storage
-  and sent per-request to run that one scan — it is never written to any
-  server-side store.
+- The buyer's AI API key **and** any personal YouTube key entered in Settings
+  are stored only in the browser's local storage and sent per-request to run
+  that one scan — neither is ever written to any server-side store.
 - Your `YOUTUBE_API_KEY`, `PAYPAL_SECRET`, `RESEND_API_KEY`, and
   `CONVERTKIT_API_KEY` live only as Netlify environment variables and are
   never sent to the browser.

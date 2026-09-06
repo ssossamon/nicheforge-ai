@@ -33,6 +33,7 @@ exports.handler = async function (event) {
   const aiProvider = String(payload.aiProvider || '').trim().toLowerCase();
   const aiApiKey = String(payload.aiApiKey || '').trim();
   const aiModel = payload.aiModel ? String(payload.aiModel).trim() : '';
+  const clientYoutubeKey = payload.youtubeApiKey ? String(payload.youtubeApiKey).trim() : '';
 
   if (!query) {
     return http.fail(400, 'missing_query', 'Enter a topic, niche, or keyword to research.');
@@ -85,19 +86,24 @@ exports.handler = async function (event) {
   }
 
   // ---- 2. Real YouTube data -------------------------------------------
-  const ytKey = process.env.YOUTUBE_API_KEY;
+  // A key entered in the app's Settings module (client-side, BYOK) takes
+  // priority — this is what lets the owner test without touching Netlify's
+  // dashboard, and later lets any buyer optionally use their own quota
+  // instead of the shared server key.
+  const ytKey = clientYoutubeKey || process.env.YOUTUBE_API_KEY;
+  const ytKeySource = clientYoutubeKey ? 'settings' : 'server';
   if (!ytKey) {
     return http.fail(
       500,
       'youtube_key_not_configured',
-      'The site owner has not configured a YouTube Data API key yet.',
-      'Set the YOUTUBE_API_KEY environment variable in Netlify (Google Cloud Console → enable "YouTube Data API v3" → create an API key).'
+      'No YouTube Data API key is available for this scan.',
+      'Add your own key in Settings, or have the site owner set the YOUTUBE_API_KEY environment variable in Netlify (Google Cloud Console → enable "YouTube Data API v3" → create an API key).'
     );
   }
 
   let evidence;
   try {
-    evidence = await gatherYoutubeEvidence(query, ytKey);
+    evidence = await gatherYoutubeEvidence(query, ytKey, ytKeySource);
   } catch (e) {
     return http.fail(
       e.statusCode || 502,
@@ -179,7 +185,7 @@ exports.handler = async function (event) {
 // Real YouTube data gathering + transparent scoring
 // ===========================================================================
 
-async function gatherYoutubeEvidence(query, ytKey) {
+async function gatherYoutubeEvidence(query, ytKey, ytKeySource) {
   const publishedAfter = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 
   const searchUrl =
@@ -190,7 +196,7 @@ async function gatherYoutubeEvidence(query, ytKey) {
     '&key=' + ytKey;
 
   const searchRes = await fetchJson(searchUrl);
-  throwOnYoutubeError(searchRes, 'search.list');
+  throwOnYoutubeError(searchRes, 'search.list', ytKeySource);
 
   const items = (searchRes.data.items || []).filter(function (it) {
     return it.id && it.id.videoId;
@@ -208,12 +214,12 @@ async function gatherYoutubeEvidence(query, ytKey) {
   const videosUrl =
     YT_BASE + '/videos?part=statistics,snippet,contentDetails&id=' + videoIds.join(',') + '&key=' + ytKey;
   const videosRes = await fetchJson(videosUrl);
-  throwOnYoutubeError(videosRes, 'videos.list');
+  throwOnYoutubeError(videosRes, 'videos.list', ytKeySource);
 
   const channelsUrl =
     YT_BASE + '/channels?part=statistics&id=' + channelIds.join(',') + '&key=' + ytKey;
   const channelsRes = await fetchJson(channelsUrl);
-  throwOnYoutubeError(channelsRes, 'channels.list');
+  throwOnYoutubeError(channelsRes, 'channels.list', ytKeySource);
 
   const channelSubs = {};
   (channelsRes.data.items || []).forEach(function (ch) {
@@ -307,6 +313,7 @@ async function gatherYoutubeEvidence(query, ytKey) {
         return { title: v.title, channelTitle: v.channelTitle, views: v.views, publishedAt: v.publishedAt, channelSubs: v.channelSubs };
       }),
     dataSource: 'YouTube Data API v3 (search.list, videos.list, channels.list) — videos published in the last 12 months, ordered by view count.',
+    youtubeKeySource: ytKeySource,
     fetchedAt: new Date().toISOString()
   };
 }
@@ -325,7 +332,7 @@ function isLikelyShort(video) {
   }
 }
 
-function throwOnYoutubeError(res, callName) {
+function throwOnYoutubeError(res, callName, ytKeySource) {
   if (res.status >= 200 && res.status < 300) return;
   const reason = res.data && res.data.error && res.data.error.errors && res.data.error.errors[0]
     ? res.data.error.errors[0].reason
@@ -334,13 +341,15 @@ function throwOnYoutubeError(res, callName) {
   if (res.status === 403 && reason === 'quotaExceeded') {
     err.statusCode = 429;
     err.code = 'youtube_quota_exceeded';
-    err.message = "The site's daily YouTube API quota has been used up.";
+    err.message = (ytKeySource === 'settings' ? 'Your' : "The site's") + ' daily YouTube API quota has been used up.';
     err.whatToDoNext = 'Try again after midnight Pacific time when the quota resets, or raise the quota in Google Cloud Console.';
   } else if (res.status === 400 && reason === 'keyInvalid') {
     err.statusCode = 500;
     err.code = 'youtube_key_invalid';
-    err.message = 'The configured YouTube API key was rejected by Google.';
-    err.whatToDoNext = 'Check the YOUTUBE_API_KEY environment variable in Netlify and confirm YouTube Data API v3 is enabled for it.';
+    err.message = (ytKeySource === 'settings' ? 'Your' : "The site's configured") + ' YouTube API key was rejected by Google.';
+    err.whatToDoNext = ytKeySource === 'settings'
+      ? 'Check the key you entered in Settings and confirm "YouTube Data API v3" is enabled for it in Google Cloud Console.'
+      : 'Check the YOUTUBE_API_KEY environment variable in Netlify and confirm YouTube Data API v3 is enabled for it.';
   } else {
     err.statusCode = 502;
     err.code = 'youtube_' + callName.replace('.', '_') + '_failed';
