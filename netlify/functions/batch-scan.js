@@ -57,13 +57,13 @@ exports.handler = async function (event) {
   let unlimited = false;
   let tier = null;
   try {
-    usageStore = getStore('nforge-usage');
+    usageStore = getStore('nforge-usage', { consistency: 'strong' });
     if (licenseKey) {
       if (license.isOwnerKey(licenseKey)) {
         unlimited = true;
         tier = 'ADM';
       } else {
-        const licensesStore = getStore('nforge-licenses');
+        const licensesStore = getStore('nforge-licenses', { consistency: 'strong' });
         const rec = await licensesStore.get(licenseKey.trim().toUpperCase(), { type: 'json' });
         if (rec && rec.status === 'active') {
           unlimited = true;

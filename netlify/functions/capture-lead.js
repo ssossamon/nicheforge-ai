@@ -64,7 +64,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    const leadsStore = getStore('nforge-leads');
+    const leadsStore = getStore('nforge-leads', { consistency: 'strong' });
     const existing = await leadsStore.get(email, { type: 'json' });
     const record = {
       email: email,

@@ -32,7 +32,7 @@ exports.handler = async function (event) {
 
   let store;
   try {
-    store = getStore('nforge-history');
+    store = getStore('nforge-history', { consistency: 'strong' });
   } catch (e) {
     return http.fail(500, 'storage_unavailable', 'History storage is not available right now: ' + e.message);
   }

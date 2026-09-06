@@ -18,7 +18,7 @@ function normalizeQueryKey(query) {
 
 async function getCachedEvidence(query) {
   try {
-    const cacheStore = getStore('nforge-scan-cache');
+    const cacheStore = getStore('nforge-scan-cache', { consistency: 'strong' });
     const rec = await cacheStore.get(normalizeQueryKey(query), { type: 'json' });
     if (!rec) return null;
     if (Date.now() > rec.expiresAt) return null;
@@ -30,7 +30,7 @@ async function getCachedEvidence(query) {
 
 async function setCachedEvidence(query, evidence) {
   try {
-    const cacheStore = getStore('nforge-scan-cache');
+    const cacheStore = getStore('nforge-scan-cache', { consistency: 'strong' });
     await cacheStore.setJSON(normalizeQueryKey(query), {
       evidence: evidence,
       cachedAt: Date.now(),
@@ -49,7 +49,7 @@ async function setCachedEvidence(query, evidence) {
 
 async function getScoreHistory(query) {
   try {
-    const store = getStore('nforge-score-history');
+    const store = getStore('nforge-score-history', { consistency: 'strong' });
     const rec = await store.get(normalizeQueryKey(query), { type: 'json' });
     return (rec && rec.points) || [];
   } catch (e) {
@@ -59,7 +59,7 @@ async function getScoreHistory(query) {
 
 async function appendScoreHistory(query, opportunityScore, avgViews) {
   try {
-    const store = getStore('nforge-score-history');
+    const store = getStore('nforge-score-history', { consistency: 'strong' });
     const key = normalizeQueryKey(query);
     const rec = (await store.get(key, { type: 'json' })) || { points: [] };
     rec.points.push({ date: new Date().toISOString(), opportunityScore: opportunityScore, avgViews: avgViews });
@@ -534,7 +534,7 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
 
 async function saveToHistory(email, query, evidence, ai) {
   try {
-    const store = getStore('nforge-history');
+    const store = getStore('nforge-history', { consistency: 'strong' });
     const id = email + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
     await store.setJSON(id, {
       id: id,
