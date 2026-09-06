@@ -191,6 +191,8 @@
       <a href="#pricing">Pricing</a>
       <a href="#license">Activate license</a>
       <a href="javascript:void(0)" id="nav-settings-link">Settings</a>
+      <a href="javascript:void(0)" id="nav-history-link">History</a>
+      <a href="javascript:void(0)" id="nav-watchlist-link">Watchlist</a>
     </div>
     <a class="navcta" href="#scan">Run a free scan</a>
   </div>
@@ -473,8 +475,36 @@
   </div>
 </div>
 
+<div class="modal-veil" id="history-modal">
+  <div class="modal" style="max-width:560px;">
+    <h3>Scan history</h3>
+    <div id="history-modal-body"><p class="muted-lo">Loading…</p></div>
+    <button class="btn btn-ghost" id="btn-close-history-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="watchlist-modal">
+  <div class="modal" style="max-width:560px;">
+    <h3>Watchlist</h3>
+    <p class="muted-lo" style="font-size:13px;">Rechecked automatically once a day using real YouTube data. Flagged topics moved 10+ points or picked up a new breakout video since the last check.</p>
+    <div id="watchlist-modal-body"><p class="muted-lo">Loading…</p></div>
+    <button class="btn btn-ghost" id="btn-close-watchlist-modal" type="button" style="margin-top:16px;">Close</button>
+  </div>
+</div>
+
+<div class="modal-veil" id="outline-modal">
+  <div class="modal" style="max-width:560px;">
+    <div id="outline-modal-body">Loading…</div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-ghost" id="btn-copy-outline" type="button" style="display:none;">Copy outline</button>
+      <button class="btn btn-ghost" id="btn-close-outline-modal" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD&intent=capture" id="paypal-sdk-placeholder"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 
 // ===========================================================================
@@ -859,6 +889,7 @@ function showResults(html) {
   wrap.innerHTML = html;
   wrap.style.display = 'block';
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  renderScoreCharts();
 }
 
 function buildDossierHtml(query, ev, ai, idx) {
@@ -875,6 +906,20 @@ function buildDossierHtml(query, ev, ai, idx) {
   html += evCell('100k+ sub channels', ev.bigChannelRatio === null ? 'unknown' : Math.round(ev.bigChannelRatio * 100) + '%');
   html += evCell('Uploads / week', ev.uploadsPerWeekInSample);
   html += '    </div>';
+
+  if (ev.scoreHistory && ev.scoreHistory.length >= 2) {
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Score over time</b> (this topic has been scanned ' + ev.scoreHistory.length + ' times):</div>';
+    html += '<canvas class="score-chart-canvas" data-idx="' + idx + '" height="70" style="margin-bottom:18px;"></canvas>';
+  }
+
+  if (ev.autocompleteSuggestions && ev.autocompleteSuggestions.length) {
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>What people actually search</b> (real YouTube autocomplete, a second demand signal):</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">';
+    for (var ac = 0; ac < ev.autocompleteSuggestions.length; ac++) {
+      html += '<span class="tichip" style="cursor:default;">' + escapeHtml(ev.autocompleteSuggestions[ac]) + '</span>';
+    }
+    html += '</div>';
+  }
 
   html += '<div class="muted-lo" style="font-size:13px;margin-bottom:6px;"><b>Top channels in this sample</b> (click one for a competitor breakdown):</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">';
@@ -905,16 +950,43 @@ function buildDossierHtml(query, ev, ai, idx) {
     html += '<p>' + escapeHtml(o.rationale) + '</p>';
     html += '<div class="titleideas">';
     for (var t = 0; t < o.titleIdeas.length; t++) {
+      html += '<span style="display:inline-flex;align-items:center;gap:4px;">';
       html += '<span class="tichip" data-copy="' + escapeHtml(o.titleIdeas[t]) + '">' + escapeHtml(o.titleIdeas[t]) + '</span>';
+      html += '<span class="tichip btn-outline-idea" style="background:transparent;border-style:dashed;font-size:11.5px;color:var(--brass-dim);" data-idx="' + idx + '" data-title="' + escapeHtml(o.titleIdeas[t]) + '" title="Generate a video outline for this title">Outline</span>';
+      html += '</span>';
     }
     html += '</div></div>';
   }
 
   if (ai.contentGap) {
-    html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '</div>';
+    var gapSourceNote = ai.contentGapSource === 'comments'
+      ? 'Grounded in real viewer comments below.'
+      : 'Inferred from title and view patterns (no usable comments in this sample).';
+    html += '<div class="gapbox"><b>Content gap:</b> ' + escapeHtml(ai.contentGap) + '<div style="font-size:12px;margin-top:6px;color:var(--brass-dim);">' + gapSourceNote + '</div></div>';
   }
 
-  html += '<button class="btn btn-ghost btn-export-pdf" data-idx="' + idx + '" type="button" style="margin-top:16px;">Export PDF</button>';
+  if (ev.topComments && ev.topComments.length) {
+    html += '<div class="muted-lo" style="font-size:12px;margin:14px 0 0;"><b>Real viewer comments this was grounded in</b> (from the highest-viewed videos in this sample):</div>';
+    html += '<ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted-lo);">';
+    for (var cm = 0; cm < Math.min(4, ev.topComments.length); cm++) {
+      html += '<li>\u201c' + escapeHtml(ev.topComments[cm].text) + '\u201d (' + ev.topComments[cm].likeCount + ' likes)</li>';
+    }
+    html += '</ul>';
+  }
+
+  if (ai.monetizationAngles && ai.monetizationAngles.length) {
+    html += '<div style="margin-top:20px;border-top:1px solid var(--line-paper);padding-top:14px;">';
+    html += '<div class="muted-lo" style="font-size:13px;margin-bottom:8px;"><b>Monetization angles</b> (strategic, not a revenue guarantee):</div>';
+    for (var m = 0; m < ai.monetizationAngles.length; m++) {
+      html += '<div style="margin-bottom:8px;"><b style="font-size:13.5px;color:var(--brass-dim);">' + escapeHtml(ai.monetizationAngles[m].type) + ':</b> <span style="font-size:13.5px;">' + escapeHtml(ai.monetizationAngles[m].description) + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">';
+  html += '<button class="btn btn-ghost btn-export-pdf" data-idx="' + idx + '" type="button">Export PDF</button>';
+  html += '<button class="btn btn-ghost btn-add-watchlist" data-query="' + escapeHtml(query) + '" type="button">Add to Watchlist</button>';
+  html += '</div>';
 
   html += '  </div>';
   html += '</div>';
@@ -923,6 +995,37 @@ function buildDossierHtml(query, ev, ai, idx) {
 
 function evCell(label, value) {
   return '<div class="evcell"><div class="k">' + escapeHtml(label) + '</div><div class="v">' + escapeHtml(String(value)) + '</div></div>';
+}
+
+function renderScoreCharts() {
+  if (!window.Chart) return;
+  var canvases = document.querySelectorAll('.score-chart-canvas');
+  for (var i = 0; i < canvases.length; i++) {
+    var canvas = canvases[i];
+    var idx = parseInt(canvas.getAttribute('data-idx'), 10);
+    var result = SCAN_RESULTS_CACHE[idx];
+    if (!result || !result.evidence.scoreHistory) continue;
+    var points = result.evidence.scoreHistory;
+    new window.Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: points.map(function (p) { return new Date(p.date).toLocaleDateString(); }),
+        datasets: [{
+          label: 'Opportunity Score',
+          data: points.map(function (p) { return p.opportunityScore; }),
+          borderColor: '#D9A441',
+          backgroundColor: 'rgba(217,164,65,0.15)',
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, max: 100 } }
+      }
+    });
+  }
 }
 
 // ---- delegated events for copy chips, channel links, PDF export ----------
@@ -941,7 +1044,18 @@ el('results-wrap').addEventListener('click', function (e) {
     return;
   }
 
-  if (target.classList.contains('tichip') && !target.classList.contains('channel-link')) {
+  if (target.classList.contains('btn-outline-idea')) {
+    var oIdx = parseInt(target.getAttribute('data-idx'), 10);
+    generateOutline(SCAN_RESULTS_CACHE[oIdx], target.getAttribute('data-title'));
+    return;
+  }
+
+  if (target.classList.contains('btn-add-watchlist')) {
+    addToWatchlist(target.getAttribute('data-query'), target);
+    return;
+  }
+
+  if (target.classList.contains('tichip') && !target.classList.contains('channel-link') && !target.classList.contains('btn-outline-idea')) {
     var text = target.getAttribute('data-copy');
     if (text && navigator.clipboard) {
       navigator.clipboard.writeText(text);
@@ -1163,6 +1277,228 @@ fetch('/api/config')
     }
   })
   .catch(function () {});
+
+// ---- History panel ---------------------------------------------------
+
+el('nav-history-link').addEventListener('click', function () {
+  el('history-modal').className = 'modal-veil open';
+  loadHistory();
+});
+el('btn-close-history-modal').addEventListener('click', function () {
+  el('history-modal').className = 'modal-veil';
+});
+
+function loadHistory() {
+  var email = lsGet('email');
+  if (!email) {
+    el('history-modal-body').innerHTML = '<p class="muted-lo">Run a scan first \u2014 history is tied to the email you scan with.</p>';
+    return;
+  }
+  el('history-modal-body').innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.history.length === 0) {
+        el('history-modal-body').innerHTML = '<p class="muted-lo">No scans saved yet.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.history.length; i++) {
+        var h = data.history[i];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line-paper);padding:10px 0;">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(h.query) + '</b><div class="muted-lo" style="font-size:12px;">Score ' + h.opportunityScore + ' \u00B7 ' + new Date(h.timestamp).toLocaleString() + '</div></div>';
+        html += '<div style="display:flex;gap:6px;"><button class="btn btn-ghost history-open-btn" data-id="' + escapeHtml(h.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Open</button>';
+        html += '<button class="btn btn-ghost history-delete-btn" data-id="' + escapeHtml(h.id) + '" type="button" style="padding:6px 10px;font-size:12px;">Delete</button></div>';
+        html += '</div>';
+      }
+      el('history-modal-body').innerHTML = html;
+    })
+    .catch(function (e) {
+      el('history-modal-body').innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('history-modal-body').addEventListener('click', function (e) {
+  var target = e.target;
+  var email = lsGet('email');
+  if (target.classList.contains('history-open-btn')) {
+    var id = target.getAttribute('data-id');
+    fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get', email: email, id: id })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) { alert(data.error ? data.error.message : 'Could not open that entry.'); return; }
+        el('history-modal').className = 'modal-veil';
+        SCAN_RESULTS_CACHE = [{ query: data.entry.query, evidence: data.entry.evidence, ai: data.entry.ai }];
+        showResults(buildDossierHtml(data.entry.query, data.entry.evidence, data.entry.ai, 0));
+      });
+  }
+  if (target.classList.contains('history-delete-btn')) {
+    var delId = target.getAttribute('data-id');
+    fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', email: email, id: delId })
+    })
+      .then(function () { loadHistory(); });
+  }
+});
+
+// ---- Watchlist panel ---------------------------------------------------
+
+el('nav-watchlist-link').addEventListener('click', function () {
+  el('watchlist-modal').className = 'modal-veil open';
+  loadWatchlist();
+});
+el('btn-close-watchlist-modal').addEventListener('click', function () {
+  el('watchlist-modal').className = 'modal-veil';
+});
+
+function loadWatchlist() {
+  var email = lsGet('email');
+  if (!email) {
+    el('watchlist-modal-body').innerHTML = '<p class="muted-lo">Run a scan first, then add topics to your watchlist.</p>';
+    return;
+  }
+  el('watchlist-modal-body').innerHTML = '<p class="muted-lo">Loading…</p>';
+  fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list', email: email })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success || data.watchlist.length === 0) {
+        el('watchlist-modal-body').innerHTML = '<p class="muted-lo">Nothing watched yet. Add a topic from any scan result.</p>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.watchlist.length; i++) {
+        var w = data.watchlist[i];
+        html += '<div style="border-top:1px solid var(--line-paper);padding:10px 0;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '<div><b style="font-size:14px;">' + escapeHtml(w.query) + '</b>' + (w.flagged ? ' <span style="background:#FBF3E4;color:#8C6C2E;border-radius:3px;padding:1px 6px;font-size:11px;">flagged</span>' : '') + '<div class="muted-lo" style="font-size:12px;">Last score: ' + (w.lastKnownScore === null ? 'not checked yet' : w.lastKnownScore) + (w.lastCheckedAt ? ' \u00B7 checked ' + new Date(w.lastCheckedAt).toLocaleDateString() : '') + '</div></div>';
+        html += '<div style="display:flex;gap:6px;"><button class="btn btn-ghost watchlist-rescan-btn" data-query="' + escapeHtml(w.query) + '" type="button" style="padding:6px 10px;font-size:12px;">Scan now</button>';
+        html += '<button class="btn btn-ghost watchlist-remove-btn" data-query="' + escapeHtml(w.query) + '" type="button" style="padding:6px 10px;font-size:12px;">Remove</button></div>';
+        html += '</div>';
+        if (w.flagged && w.flagReason) {
+          html += '<div style="font-size:12.5px;color:#8C6C2E;margin-top:4px;">' + escapeHtml(w.flagReason) + ' <a href="javascript:void(0)" class="watchlist-ack-btn" data-query="' + escapeHtml(w.query) + '" style="color:var(--brass-dim);">Dismiss</a></div>';
+        }
+        html += '</div>';
+      }
+      el('watchlist-modal-body').innerHTML = html;
+    })
+    .catch(function (e) {
+      el('watchlist-modal-body').innerHTML = '<p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('watchlist-modal-body').addEventListener('click', function (e) {
+  var target = e.target;
+  var email = lsGet('email');
+  if (target.classList.contains('watchlist-remove-btn')) {
+    fetch('/api/watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'remove', email: email, query: target.getAttribute('data-query') })
+    }).then(function () { loadWatchlist(); });
+  }
+  if (target.classList.contains('watchlist-ack-btn')) {
+    fetch('/api/watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'acknowledge', email: email, query: target.getAttribute('data-query') })
+    }).then(function () { loadWatchlist(); });
+  }
+  if (target.classList.contains('watchlist-rescan-btn')) {
+    var q = target.getAttribute('data-query');
+    el('watchlist-modal').className = 'modal-veil';
+    setMode('single');
+    el('f-query').value = q;
+    ensureEmail(function (em) { doScan(q, em); });
+  }
+});
+
+function addToWatchlist(query, buttonEl) {
+  var email = lsGet('email');
+  if (!email) { alert('Run a scan first so we know which email to attach the watchlist to.'); return; }
+  fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'add', email: email, query: query })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success && buttonEl) {
+        buttonEl.textContent = 'Watching \u2713';
+        buttonEl.disabled = true;
+      }
+    })
+    .catch(function () {});
+}
+
+// ---- Generate outline from a chosen title -----------------------------
+
+function generateOutline(result, titleIdea) {
+  if (!result) return;
+  el('outline-modal-body').innerHTML = '<h3>' + escapeHtml(titleIdea) + '</h3><p class="muted-lo">Writing an outline grounded in this scan\u2019s real data…</p>';
+  el('btn-copy-outline').style.display = 'none';
+  el('outline-modal').className = 'modal-veil open';
+
+  fetch('/api/generate-outline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      titleIdea: titleIdea,
+      query: result.query,
+      evidence: result.evidence,
+      aiProvider: lsGet('ai_provider') || 'openai',
+      aiApiKey: lsGet('ai_key') || ''
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        el('outline-modal-body').innerHTML = '<h3>' + escapeHtml(titleIdea) + '</h3><p class="status-bad">' + escapeHtml(data.error ? data.error.message : 'Could not generate an outline.') + '</p>';
+        return;
+      }
+      var o = data.outline;
+      var html = '<h3 style="margin-bottom:4px;">' + escapeHtml(titleIdea) + '</h3>';
+      html += '<div class="muted-lo" style="font-size:12.5px;margin-bottom:14px;">Suggested length: ~' + o.suggestedLengthMinutes + ' min</div>';
+      html += '<p style="font-style:italic;">\u201c' + escapeHtml(o.hook) + '\u201d</p>';
+      for (var i = 0; i < o.sections.length; i++) {
+        html += '<div style="margin-top:12px;"><b>' + (i + 1) + '. ' + escapeHtml(o.sections[i].title) + '</b><ul style="margin:4px 0 0;padding-left:18px;font-size:13.5px;">';
+        for (var p = 0; p < o.sections[i].points.length; p++) {
+          html += '<li>' + escapeHtml(o.sections[i].points[p]) + '</li>';
+        }
+        html += '</ul></div>';
+      }
+      html += '<div style="margin-top:14px;"><b>Call to action:</b> ' + escapeHtml(o.callToAction) + '</div>';
+      el('outline-modal-body').innerHTML = html;
+      el('btn-copy-outline').style.display = 'inline-flex';
+      el('btn-copy-outline').onclick = function () {
+        var text = titleIdea + '\n\nHook: ' + o.hook + '\n\n' + o.sections.map(function (s, si) {
+          return (si + 1) + '. ' + s.title + '\n' + s.points.map(function (pt) { return '  - ' + pt; }).join('\n');
+        }).join('\n\n') + '\n\nCTA: ' + o.callToAction;
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        el('btn-copy-outline').textContent = 'Copied!';
+      };
+    })
+    .catch(function (e) {
+      el('outline-modal-body').innerHTML = '<h3>' + escapeHtml(titleIdea) + '</h3><p class="status-bad">Network error: ' + escapeHtml(e.message) + '</p>';
+    });
+}
+
+el('btn-close-outline-modal').addEventListener('click', function () {
+  el('outline-modal').className = 'modal-veil';
+});
 
 </script>
 </body>

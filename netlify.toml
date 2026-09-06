@@ -5,6 +5,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions."watchlist-recheck"]
+  schedule = "@daily"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

@@ -63,7 +63,10 @@ key.
 - `nforge-leads` — one record per email: `{email, name, source, espSynced, firstSeenAt, lastSeenAt}`
 - `nforge-licenses` — one record per key: `{key, tier, email, name, status, source, createdAt}`
 - `nforge-usage` — free-scan counters per email: `{count, lastScanAt}`
-- `nforge-scans` — rolling scan log for admin visibility: `{email, query, opportunityScore, timestamp}`
+- `nforge-scan-cache` — 24h-TTL real-evidence cache keyed by normalized topic (v1.2)
+- `nforge-history` — full saved scans keyed by `email::timestamp::rand`, browsable in-app (v1.3, replaces the old lightweight `nforge-scans` log)
+- `nforge-score-history` — up to 30 score points per normalized topic, for the trend chart (v1.3)
+- `nforge-watchlist` — one record per `email::topic`: `{lastKnownScore, lastCheckedAt, flagged, flagReason}` (v1.3)
 
 ## Settings module (v1.1)
 
@@ -75,6 +78,37 @@ your own free Google quota instead (this is what lets the owner test heavily
 without touching Netlify's dashboard, and later lets any buyer optionally
 supply their own quota). Every scan result now labels which key served it
 ("using your own YouTube key" vs "using the app's shared YouTube key").
+
+## v1.3 — history, real comments, monetization angles, outlines, watchlist
+
+- **Scan history** (`netlify/functions/history.js`) — every successful scan is
+  auto-saved per email (`nforge-history` store) and browsable from the new
+  "History" nav link: reopen any past scan in full, or delete it.
+- **Real viewer comments as evidence** — `scan-core.js` now pulls real top
+  comments from the sample's highest-viewed videos (`commentThreads.list`)
+  and instructs the AI to ground the content gap in them when present,
+  labeling on-screen whether the gap came from comments or from title/view
+  patterns.
+- **Real YouTube autocomplete signal** — a second, genuinely different
+  demand signal (what people actually type before searching), pulled from
+  YouTube's own public suggestion endpoint — free, no API key, no quota.
+- **Score history + trend chart** — every fresh (non-cached) scan of a topic
+  appends to `nforge-score-history`; the dossier renders a real Chart.js
+  line chart once a topic has been scanned twice.
+- **Monetization angles** — the AI now also returns 2-4 qualitative
+  monetization angles (affiliate, digital product, sponsorship, etc.)
+  grounded in the real evidence — deliberately never a specific dollar
+  figure or RPM estimate, since nothing in the real evidence can honestly
+  support one.
+- **Video outline generator** (`netlify/functions/generate-outline.js`) — an
+  "Outline" button next to every title idea turns it into a structured,
+  grounded outline (hook, sections, CTA) using the same real evidence.
+- **Watchlist** (`netlify/functions/watchlist.js` +
+  `netlify/functions/watchlist-recheck.js`) — star any topic; a scheduled
+  daily function (`@daily` in `netlify.toml`) re-checks it with real data
+  only (no AI call — it's a background job) and flags a 10+ point score
+  move or a new breakout video. No email/push notification yet — flags
+  show up next time you open the Watchlist panel.
 
 ## v1.2 — batch mode, competitor breakdown, caching, PDF export
 
@@ -126,6 +160,11 @@ key configured (this is a single program, not a tiered product):
 - [ ] Batch of 5 topics, one deliberately nonsense → 4 succeed, 1 shows a per-topic error, batch still completes
 - [ ] Click a channel name in results → breakdown panel shows real subscriber/upload/Shorts data
 - [ ] "Export PDF" on a dossier → downloads a readable PDF with the same real numbers and AI opportunities shown on screen
+- [ ] Run a scan → open History → the scan appears and reopens in full
+- [ ] Scan the same topic a 2nd time (skip cache) → a real score-trend chart appears
+- [ ] "Add to Watchlist" → topic shows up in the Watchlist panel
+- [ ] Click "Outline" on a title idea → a grounded outline appears, "Copy outline" works
+- [ ] `watchlist-recheck` scheduled function shows up in Netlify's Functions list with a daily schedule
 
 ## Deploying
 

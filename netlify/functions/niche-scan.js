@@ -117,22 +117,14 @@ exports.handler = async function (event) {
     );
   }
 
-  // ---- 3. Record usage + scan log ----------------------------------------
+  // ---- 3. Record usage + save to history ----------------------------------
   try {
     if (!unlimited) {
       const usageRaw = await usageStore.get(email, { type: 'json' });
       const usedCount = (usageRaw && usageRaw.count ? usageRaw.count : 0) + 1;
       await usageStore.setJSON(email, { count: usedCount, lastScanAt: new Date().toISOString() });
     }
-    const scansStore = getStore('nforge-scans');
-    const logKey = new Date().toISOString() + '_' + Math.random().toString(36).slice(2, 8);
-    await scansStore.setJSON(logKey, {
-      email: email,
-      query: query,
-      tier: tier,
-      opportunityScore: evidence.opportunityScore,
-      timestamp: new Date().toISOString()
-    });
+    await core.saveToHistory(email, query, evidence, result.ai);
   } catch (e) {
     // Non-fatal — never block a real result just because logging failed.
   }

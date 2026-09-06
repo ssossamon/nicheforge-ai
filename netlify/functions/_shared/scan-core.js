@@ -42,6 +42,89 @@ async function setCachedEvidence(query, evidence) {
 }
 
 // ===========================================================================
+// Score history — every FRESH (non-cached) real scan of a topic appends a
+// point here, so repeat scans of the same topic can show a real trend line
+// instead of a single snapshot. Capped at the most recent 30 points.
+// ===========================================================================
+
+async function getScoreHistory(query) {
+  try {
+    const store = getStore('nforge-score-history');
+    const rec = await store.get(normalizeQueryKey(query), { type: 'json' });
+    return (rec && rec.points) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+async function appendScoreHistory(query, opportunityScore, avgViews) {
+  try {
+    const store = getStore('nforge-score-history');
+    const key = normalizeQueryKey(query);
+    const rec = (await store.get(key, { type: 'json' })) || { points: [] };
+    rec.points.push({ date: new Date().toISOString(), opportunityScore: opportunityScore, avgViews: avgViews });
+    if (rec.points.length > 30) rec.points = rec.points.slice(rec.points.length - 30);
+    await store.setJSON(key, rec);
+    return rec.points;
+  } catch (e) {
+    return [];
+  }
+}
+
+// ===========================================================================
+// Real viewer comments — pulled from the top few highest-viewed videos in
+// the sample so the AI's "content gap" can be grounded in what viewers
+// actually said, not just inferred from titles and view counts. Videos with
+// comments disabled are skipped silently rather than failing the scan.
+// ===========================================================================
+
+async function gatherTopComments(videoIds, ytKey) {
+  const comments = [];
+  for (let i = 0; i < videoIds.length && comments.length < 15; i++) {
+    try {
+      const res = await fetchJson(
+        YT_BASE + '/commentThreads?part=snippet&order=relevance&maxResults=5&videoId=' + videoIds[i] + '&key=' + ytKey
+      );
+      if (res.status < 200 || res.status >= 300) continue;
+      (res.data.items || []).forEach(function (item) {
+        const top = item.snippet && item.snippet.topLevelComment && item.snippet.topLevelComment.snippet;
+        if (!top) return;
+        comments.push({
+          text: String(top.textDisplay || '').replace(/<[^>]+>/g, '').slice(0, 240),
+          likeCount: top.likeCount || 0
+        });
+      });
+    } catch (e) {
+      // Comments disabled or API hiccup for this video — skip, don't fail the scan.
+    }
+  }
+  return comments.sort(function (a, b) { return b.likeCount - a.likeCount; }).slice(0, 12);
+}
+
+// ===========================================================================
+// Real YouTube autocomplete signal — what people actually type before they
+// search. This is YouTube's own public suggestion endpoint (no API key, no
+// quota cost), used here as a second, genuinely different demand signal
+// alongside the ranked-results data above.
+// ===========================================================================
+
+async function gatherAutocompleteSuggestions(query) {
+  try {
+    const res = await fetch(
+      'https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&hl=en&gl=US&q=' + encodeURIComponent(query)
+    );
+    const text = await res.text();
+    const match = text.match(/\[.*\]/s);
+    if (!match) return [];
+    const parsed = JSON.parse(match[0]);
+    const suggestions = (parsed[1] || []).map(function (item) { return Array.isArray(item) ? item[0] : item; });
+    return suggestions.filter(Boolean).slice(0, 10);
+  } catch (e) {
+    return [];
+  }
+}
+
+// ===========================================================================
 // Real YouTube data gathering + transparent scoring
 // ===========================================================================
 
@@ -159,6 +242,16 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
   const freshnessBonus = daysSinceMostRecent <= 14 ? 10 : daysSinceMostRecent <= 30 ? 5 : 0;
   const opportunityScore = Math.max(0, Math.min(100, Math.round(demandPoints - saturationPenalty + freshnessBonus)));
 
+  // Real, independent signals alongside the ranked-results data above.
+  const topVideoIdsForComments = videos
+    .slice()
+    .sort(function (a, b) { return b.views - a.views; })
+    .slice(0, 5)
+    .map(function (v) { return v.id; });
+  const topComments = await gatherTopComments(topVideoIdsForComments, ytKey);
+  const autocompleteSuggestions = await gatherAutocompleteSuggestions(query);
+  const scoreHistory = await appendScoreHistory(query, opportunityScore, avgViews);
+
   const evidence = {
     videoCount: videos.length,
     totalResultsReportedByYoutube: searchRes.data.pageInfo ? searchRes.data.pageInfo.totalResults : null,
@@ -179,7 +272,10 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
       .map(function (v) {
         return { channelId: v.channelId, title: v.title, channelTitle: v.channelTitle, views: v.views, publishedAt: v.publishedAt, channelSubs: v.channelSubs };
       }),
-    dataSource: 'YouTube Data API v3 (search.list, videos.list, channels.list) — videos published in the last 12 months, ordered by view count.',
+    topComments: topComments,
+    autocompleteSuggestions: autocompleteSuggestions,
+    scoreHistory: scoreHistory,
+    dataSource: 'YouTube Data API v3 (search.list, videos.list, channels.list, commentThreads.list) plus YouTube\u2019s public autocomplete endpoint — videos published in the last 12 months, ordered by view count.',
     youtubeKeySource: ytKeySource,
     fetchedAt: new Date().toISOString(),
     fromCache: false
@@ -237,15 +333,22 @@ function throwOnYoutubeError(res, callName, ytKeySource) {
 function buildSystemPrompt() {
   return (
     'You are a content-strategy research analyst working from REAL YouTube data provided below. ' +
-    'You must not invent view counts, subscriber counts, or any other statistic beyond what is given. ' +
+    'You must not invent view counts, subscriber counts, revenue figures, or any other statistic beyond what is given. ' +
     'When you reference a number, it must come from the provided evidence. ' +
     'Respond with STRICT JSON only, no markdown code fences, no commentary before or after, matching this shape exactly: ' +
     '{"opportunities":[{"angle":string,"rationale":string,"titleIdeas":[string,string,string,string,string]}],' +
-    '"contentGap":string}. ' +
+    '"contentGap":string,"contentGapSource":"comments"|"patterns",' +
+    '"monetizationAngles":[{"type":string,"description":string}]}. ' +
     'Produce between 3 and 5 items in "opportunities". "rationale" must explicitly tie back to a real number from the evidence ' +
     '(e.g. "avg views of X across the sample" or "N of the top channels have 100k+ subscribers"). ' +
     '"titleIdeas" should be inspired by the style/phrasing of the real top-performing titles provided, but must be original wording, ' +
-    'never a verbatim copy of any provided title. "contentGap" should name one specific, underserved angle visible in the data.'
+    'never a verbatim copy of any provided title. ' +
+    '"contentGap" should name one specific, underserved angle visible in the data — prefer grounding it in the REAL VIEWER COMMENTS ' +
+    'provided (a recurring question, complaint, or request) when any are given, and set "contentGapSource" to "comments" in that case; ' +
+    'otherwise infer it from title/view patterns and set "contentGapSource" to "patterns". ' +
+    '"monetizationAngles" should list 2-4 realistic ways a creator could monetize content in this niche (e.g. affiliate, digital product, ' +
+    'sponsorship, ad revenue, service/coaching), each a qualitative strategic description grounded in what the evidence shows about the niche ' +
+    '— never invent a specific dollar amount, RPM, or earnings figure; only Scott\u2019s own stated numbers (none given here) would be trustworthy for that.'
   );
 }
 
@@ -258,6 +361,12 @@ function buildUserPrompt(query, evidence) {
         return '- "' + b.title + '" by ' + b.channelTitle + ' got ' + b.views + ' views vs that channel\u2019s sampled average of ' + b.channelAvgViews;
       }).join('\n')
     : '(none detected in this sample)';
+  const commentsBlock = (evidence.topComments && evidence.topComments.length)
+    ? evidence.topComments.map(function (c) { return '- "' + c.text + '" (' + c.likeCount + ' likes)'; }).join('\n')
+    : '(no comments retrieved for this sample)';
+  const autocompleteBlock = (evidence.autocompleteSuggestions && evidence.autocompleteSuggestions.length)
+    ? evidence.autocompleteSuggestions.join(', ')
+    : '(none returned)';
 
   return (
     'TOPIC: ' + query + '\n\n' +
@@ -272,6 +381,8 @@ function buildUserPrompt(query, evidence) {
     '- Opportunity Score (0-100, deterministic formula, not AI-generated): ' + evidence.opportunityScore + '\n\n' +
     'TOP PERFORMING VIDEOS IN THIS SAMPLE:\n' + topTitles + '\n\n' +
     'BREAKOUT VIDEOS (outperformed their own channel\u2019s sampled average by 2x+):\n' + breakouts + '\n\n' +
+    'REAL VIEWER COMMENTS from the highest-viewed videos in this sample (use these to ground the content gap when they reveal a recurring need):\n' + commentsBlock + '\n\n' +
+    'REAL SEARCH-BOX AUTOCOMPLETE SUGGESTIONS for this topic (what people actually type before searching):\n' + autocompleteBlock + '\n\n' +
     'Using ONLY the evidence above, produce the JSON described in your instructions.'
   );
 }
@@ -358,6 +469,8 @@ async function runAiSynthesis(provider, apiKey, model, query, evidence) {
     err.rawResponse = cleaned.slice(0, 4000);
     throw err;
   }
+  if (!Array.isArray(parsed.monetizationAngles)) parsed.monetizationAngles = [];
+  if (!parsed.contentGapSource) parsed.contentGapSource = 'patterns';
   return parsed;
 }
 
@@ -413,11 +526,38 @@ async function runFullScan(query, ytKey, ytKeySource, skipCache, aiProvider, aiA
   return { evidence: evidence, ai: ai };
 }
 
+// ===========================================================================
+// Scan history — every successful scan (single or batch) is saved here so
+// it can be reopened later instead of vanishing the moment you navigate
+// away. Keyed by email so each person's history stays separate.
+// ===========================================================================
+
+async function saveToHistory(email, query, evidence, ai) {
+  try {
+    const store = getStore('nforge-history');
+    const id = email + '::' + Date.now() + '::' + Math.random().toString(36).slice(2, 8);
+    await store.setJSON(id, {
+      id: id,
+      email: email,
+      query: query,
+      opportunityScore: evidence.opportunityScore,
+      avgViews: evidence.avgViews,
+      timestamp: new Date().toISOString(),
+      evidence: evidence,
+      ai: ai
+    });
+    return id;
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = {
   gatherYoutubeEvidence: gatherYoutubeEvidence,
   runAiSynthesis: runAiSynthesis,
   runFullScan: runFullScan,
   normalizeQueryKey: normalizeQueryKey,
+  saveToHistory: saveToHistory,
   YT_BASE: YT_BASE,
   fetchJson: fetchJson
 };

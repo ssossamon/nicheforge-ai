@@ -130,7 +130,7 @@ exports.handler = async function (event) {
     }
   }
 
-  // ---- Record usage (count only successful scans) + log -------------------
+  // ---- Record usage (count only successful scans) + save to history -------
   const successCount = results.filter(function (r) { return r.success; }).length;
   try {
     if (!unlimited && successCount > 0) {
@@ -138,18 +138,9 @@ exports.handler = async function (event) {
       const usedCount = (usageRaw && usageRaw.count ? usageRaw.count : 0) + successCount;
       await usageStore.setJSON(email, { count: usedCount, lastScanAt: new Date().toISOString() });
     }
-    const scansStore = getStore('nforge-scans');
     for (let j = 0; j < results.length; j++) {
       if (!results[j].success) continue;
-      const logKey = new Date().toISOString() + '_' + Math.random().toString(36).slice(2, 8);
-      await scansStore.setJSON(logKey, {
-        email: email,
-        query: results[j].query,
-        tier: tier,
-        opportunityScore: results[j].evidence.opportunityScore,
-        timestamp: new Date().toISOString(),
-        batch: true
-      });
+      await core.saveToHistory(email, results[j].query, results[j].evidence, results[j].ai);
     }
   } catch (e) {
     // Non-fatal.
