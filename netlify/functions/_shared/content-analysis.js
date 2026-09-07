@@ -138,7 +138,9 @@ async function gatherChannelEvidence(channelId, ytKey, ytKeySource) {
           core.YT_BASE + '/videos?part=snippet,statistics,contentDetails&id=' + videoIds.join(',') + '&key=' + ytKey
         );
         if (vidsRes.status >= 200 && vidsRes.status < 300) {
-          recentVideos = (vidsRes.data.items || []).map(function (v) {
+          recentVideos = (vidsRes.data.items || []).filter(function (v) {
+            return v.snippet && new Date(v.snippet.publishedAt).getTime() >= new Date(core.EVIDENCE_START_ISO).getTime();
+          }).map(function (v) {
             return {
               title: v.snippet.title,
               publishedAt: v.snippet.publishedAt,
@@ -211,8 +213,10 @@ async function gatherChannelEvidence(channelId, ytKey, ytKeySource) {
     channelHealthScore: channelHealthScore,
     channelHealthFormula: 'cadencePoints(0-35, best at 1-7 uploads/week) + trendPoints(0-30, newer vs older half of sample) + viewToSubPoints(0-35, avg recent views / subscriber count). Deterministic, computed from real YouTube data.',
     autocompleteSuggestions: autocompleteSuggestions,
-    dataSource: 'YouTube Data API v3 (channels.list, playlistItems.list, videos.list) — most recent uploads only, real numbers, no estimates.',
-    youtubeKeySource: ytKeySource
+    dataSource: 'YouTube Data API v3 — channel uploads published on or after January 1, 2026 only.',
+    youtubeKeySource: ytKeySource,
+    evidenceStartDate: core.EVIDENCE_START_ISO,
+    freshnessPolicy: '2026-only'
   };
 }
 
@@ -256,6 +260,12 @@ async function gatherVideoEvidence(videoId, ytKey, ytKeySource) {
   const likes = parseInt((item.statistics && item.statistics.likeCount) || '0', 10);
   const commentCount = parseInt((item.statistics && item.statistics.commentCount) || '0', 10);
   const publishedAt = item.snippet.publishedAt;
+  if (new Date(publishedAt).getTime() < new Date(core.EVIDENCE_START_ISO).getTime()) {
+    const err = new Error('This video was published before January 1, 2026 and is outside NicheForge\u2019s current evidence policy.');
+    err.statusCode = 400;
+    err.code = 'evidence_too_old';
+    throw err;
+  }
   const daysSincePublished = Math.max(1, Math.floor((Date.now() - new Date(publishedAt).getTime()) / 86400000));
   const isShort = isLikelyShortDuration(item.contentDetails && item.contentDetails.duration);
 
@@ -310,7 +320,9 @@ async function gatherVideoEvidence(videoId, ytKey, ytKeySource) {
     videoPerformanceScore: videoPerformanceScore,
     videoPerformanceFormula: 'velocityPoints(0-45, views/day since publish) + relativePoints(0-35, this video vs channel\u2019s recent average) + engagementPoints(0-20, (likes+comments)/views). Deterministic, computed from real YouTube data.',
     dataSource: 'YouTube Data API v3 (videos.list, commentThreads.list) plus the channel\u2019s recent uploads for comparison' + (transcript ? ' and YouTube\u2019s public caption track.' : '.'),
-    youtubeKeySource: ytKeySource
+    youtubeKeySource: ytKeySource,
+    evidenceStartDate: core.EVIDENCE_START_ISO,
+    freshnessPolicy: '2026-only'
   };
 }
 

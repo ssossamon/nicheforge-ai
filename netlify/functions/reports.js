@@ -427,7 +427,7 @@ async function generateExecutiveSummary(provider, apiKey, model, title, items) {
   const systemPrompt =
     'You are the presentation strategist for a premium market-intelligence report. You are turning one or more already-completed ' +
     'research runs (niche scans, video analyses, channel analyses, competitor analyses, or transcript playbooks) into a decisive, ' +
-    'Gamma-style narrative. Every item already has real evidence and analysis — organize and explain it, never invent a number. ' +
+    'Gamma-style narrative. Every item already has real evidence and analysis — organize and explain it, never invent a number. Treat January 1, 2026 as the evidence floor and never introduce older market information. ' +
     'Respond with STRICT JSON only, no markdown fences, matching exactly: ' +
     '{"overview":string,"verdict":{"label":"GO"|"CONDITIONAL GO"|"WATCH"|"NO-GO","reason":string},' +
     '"marketOpportunity":string,"audienceInsight":string,"keyRisks":[string,string,string],' +

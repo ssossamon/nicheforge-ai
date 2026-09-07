@@ -335,6 +335,7 @@
           <a href="javascript:void(0)" id="nav-reports-link">Reports</a>
           <a href="javascript:void(0)" id="nav-competitors-link">Competitors</a>
           <a href="javascript:void(0)" id="nav-playbooks-link">Playbooks</a>
+          <a href="javascript:void(0)" id="nav-remix-studio-link">Pattern Studio</a>
           <a href="javascript:void(0)" id="nav-import-export-link">Import / Export</a>
         </div>
       </div>
@@ -351,6 +352,7 @@
       <p class="lede">Enter a topic. NicheForge AI pulls real YouTube search data — views, upload frequency, channel size, breakout videos — then uses your own AI provider to turn that into ranked content angles and title ideas grounded in what's actually working right now.</p>
       <div class="trust">
         <span><span class="dot"></span> Real YouTube Data API v3 data, not estimates</span>
+        <span><span class="dot"></span> 2026 evidence only</span>
         <span><span class="dot"></span> Your own OpenAI, Anthropic, or Gemini key</span>
         <span><span class="dot"></span> 3 free scans, no credit card</span>
       </div>
@@ -456,7 +458,7 @@
       </div>
       <div class="step">
         <h4>2. We pull real YouTube data</h4>
-        <p>Views, upload cadence, channel size, and any breakout videos from the last 12 months — via YouTube's own API, not a scraped guess.</p>
+        <p>Views, upload cadence, channel size, and breakout videos published in 2026 — via YouTube's own API, not a scraped guess.</p>
       </div>
       <div class="step">
         <h4>3. Your AI writes the strategy</h4>
@@ -813,6 +815,19 @@
   </div>
 </div>
 
+<div class="modal-veil" id="remix-studio-modal">
+  <div class="modal" style="max-width:920px;max-height:92vh;overflow-y:auto;">
+    <h3>Pattern-to-Production Studio <span class="tichip" style="cursor:default;background:#E9F3EC;color:#2E7D4F;">2026 evidence only</span></h3>
+    <p>Import a Tube Remix analysis or use the latest NicheForge video analysis. NicheForge transfers the mechanism, never the source wording.</p>
+    <div class="report-grid">
+      <div class="report-card"><div class="kicker">Creator DNA</div><label for="studio-niche">Niche</label><input id="studio-niche" type="text" placeholder="Your niche"><label for="studio-audience">Audience</label><input id="studio-audience" type="text" placeholder="Who you help"><label for="studio-voice">Voice and style</label><input id="studio-voice" type="text" placeholder="Direct, practical, encouraging"><label for="studio-credentials">Real experience or credentials</label><textarea id="studio-credentials" rows="3" placeholder="Only claims you can prove"></textarea></div>
+      <div class="report-card"><div class="kicker">This production</div><label for="studio-topic">Target topic</label><input id="studio-topic" type="text" placeholder="The new video topic"><label for="studio-take">My Take</label><textarea id="studio-take" rows="4" placeholder="Your experience, result, mistake, story, or contrarian opinion"></textarea><label for="studio-pattern">Abstract pattern JSON</label><textarea id="studio-pattern" rows="4" placeholder="Tube Remix companion data appears here"></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" id="btn-run-remix-studio" type="button" style="width:auto;">Generate original production pack</button><button class="btn btn-ghost" id="btn-save-creator-dna" type="button">Save Creator DNA</button><button class="btn btn-ghost" id="btn-close-remix-studio" type="button">Close</button></div>
+    <div id="remix-studio-status" class="status-line"></div><div id="remix-studio-output" style="margin-top:16px;"></div>
+  </div>
+</div>
+
 
 <div class="modal-veil" id="outline-modal">
   <div class="modal" style="max-width:560px;">
@@ -836,6 +851,7 @@
 // ===========================================================================
 
 var LS_PREFIX = 'nforge_';
+var LAST_REMIX_SOURCE = null;
 
 function lsGet(key) {
   try { return localStorage.getItem(LS_PREFIX + key); } catch (e) { return null; }
@@ -1564,6 +1580,7 @@ function doAnalyze(input, email) {
         return;
       }
       el('scan-status').textContent = '';
+      LAST_REMIX_SOURCE = { sourceTitle: data.evidence.title || '', sourceTranscript: typeof data.evidence.transcript === 'string' ? data.evidence.transcript : '', pattern: data.ai || {}, topic: data.evidence.title || '' };
       if (data.contentType === 'video') renderVideoAnalysis(data.evidence, data.ai);
       else if (data.contentType === 'channel') renderChannelAnalysis(data.evidence, data.ai);
       else renderTranscriptAnalysis(data.evidence, data.ai);
@@ -2234,7 +2251,7 @@ function buildDossierHtml(query, ev, ai, idx) {
   var html = '';
   html += '<div class="dossier">';
   html += '  <div class="dossier-head">';
-  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; last 12 months &middot; ' + (ev.youtubeKeySource === 'settings' ? 'using your own YouTube key' : "using the app's shared YouTube key") + (ev.fromCache ? ' &middot; cached result' : '') + '</div></div>';
+  html += '    <div><h3 style="margin-bottom:2px;">' + escapeHtml(query) + '</h3><div class="muted-lo" style="font-size:13px;">' + ev.videoCount + ' videos sampled &middot; published in 2026 &middot; ' + (ev.youtubeKeySource === 'settings' ? 'using your own YouTube key' : "using the app's shared YouTube key") + (ev.fromCache ? ' &middot; cached result' : '') + '</div></div>';
   html += '    <div style="text-align:right;"><div class="score">' + ev.opportunityScore + '</div><div class="muted-lo" style="font-size:12px;">Opportunity Score</div></div>';
   html += '  </div>';
   html += '  <div class="dossier-body">';
@@ -2498,7 +2515,7 @@ function exportDossierToPdf(result) {
   addLine('NicheForge AI \u2014 ' + result.query, 18, 'bold', 6);
   addLine('Opportunity Score: ' + ev.opportunityScore + ' / 100', 12, 'bold', 10);
 
-  addLine('Real YouTube data (' + ev.videoCount + ' videos, last 12 months):', 12, 'bold', 2);
+  addLine('Real YouTube data (' + ev.videoCount + ' videos published in 2026):', 12, 'bold', 2);
   addLine('Avg views: ' + ev.avgViews.toLocaleString() + '   Median views: ' + ev.medianViews.toLocaleString(), 10, 'normal', 2);
   addLine('Channels with 100k+ subs: ' + (ev.bigChannelRatio === null ? 'unknown' : Math.round(ev.bigChannelRatio * 100) + '%') + '   Uploads/week: ' + ev.uploadsPerWeekInSample, 10, 'normal', 10);
   addLine('Score formula: ' + ev.scoreFormula, 8, 'italic', 14);
@@ -2870,6 +2887,37 @@ function generateOutline(result, titleIdea) {
 el('btn-close-outline-modal').addEventListener('click', function () {
   el('outline-modal').className = 'modal-veil';
 });
+
+// ---- Pattern-to-Production Studio + Tube Remix companion --------------
+
+function getCreatorDNA() { try { return JSON.parse(lsGet('creator_dna') || '{}') || {}; } catch (e) { return {}; } }
+function loadCreatorDNA() { var d = getCreatorDNA(); el('studio-niche').value = d.niche || ''; el('studio-audience').value = d.audience || ''; el('studio-voice').value = d.voice || ''; el('studio-credentials').value = d.credentials || ''; }
+function readCreatorDNA() { return { niche: el('studio-niche').value.trim(), audience: el('studio-audience').value.trim(), voice: el('studio-voice').value.trim(), credentials: el('studio-credentials').value.trim() }; }
+function saveCreatorDNA() { lsSet('creator_dna', JSON.stringify(readCreatorDNA())); el('remix-studio-status').className = 'status-line status-ok'; el('remix-studio-status').textContent = 'Creator DNA saved on this device.'; }
+function openRemixStudio(source) { loadCreatorDNA(); if (source) { LAST_REMIX_SOURCE = source; el('studio-pattern').value = JSON.stringify(source.pattern || source.analysis || {}, null, 2); el('studio-topic').value = source.topic || source.sourceTitle || ''; } el('remix-studio-modal').className = 'modal-veil open'; }
+
+el('nav-remix-studio-link').addEventListener('click', function () { openRemixStudio(LAST_REMIX_SOURCE); });
+el('btn-close-remix-studio').addEventListener('click', function () { el('remix-studio-modal').className = 'modal-veil'; });
+el('btn-save-creator-dna').addEventListener('click', saveCreatorDNA);
+el('btn-run-remix-studio').addEventListener('click', function () {
+  var pattern; try { pattern = JSON.parse(el('studio-pattern').value || '{}'); } catch (e) { el('remix-studio-status').className = 'status-line status-bad'; el('remix-studio-status').textContent = 'Pattern JSON is not valid.'; return; }
+  if (!lsGet('ai_key')) { el('remix-studio-modal').className = 'modal-veil'; openSettingsModal(); return; }
+  saveCreatorDNA(); var btn = this; btn.disabled = true; btn.textContent = 'Building production pack…'; el('remix-studio-status').textContent = '';
+  fetch('/api/remix-studio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: lsGet('email') || el('f-email').value.trim(), aiProvider: lsGet('ai_provider') || 'openai', aiApiKey: lsGet('ai_key'), aiModel: lsGet('ai_model') || '', creatorDNA: readCreatorDNA(), topic: el('studio-topic').value.trim(), myTake: el('studio-take').value.trim(), pattern: pattern, sourceTitle: LAST_REMIX_SOURCE ? LAST_REMIX_SOURCE.sourceTitle : '', sourceTranscript: LAST_REMIX_SOURCE ? LAST_REMIX_SOURCE.sourceTranscript : '' }) })
+    .then(function (r) { return r.json(); }).then(function (data) { btn.disabled = false; btn.textContent = 'Generate original production pack'; if (!data.success) { el('remix-studio-status').className = 'status-line status-bad'; el('remix-studio-status').textContent = data.error ? data.error.message : 'Generation failed.'; return; } renderRemixStudio(data); }).catch(function (e) { btn.disabled = false; btn.textContent = 'Generate original production pack'; el('remix-studio-status').className = 'status-line status-bad'; el('remix-studio-status').textContent = 'Network error: ' + e.message; });
+});
+
+function renderRemixStudio(data) {
+  var s = data.studio, g = data.originality; var html = '<div class="report-cover"><div class="eyebrow">Original Production Pack</div><h2>' + escapeHtml(s.angle || 'Your original content angle') + '</h2><div class="report-score-row"><div class="report-score-pill"><b>' + s.transferability.score + '/100</b><br>Transferability</div><div class="report-score-pill"><b>' + escapeHtml(s.transferability.label) + '</b><br>Portability</div><div class="report-score-pill"><b>' + escapeHtml(g.level.toUpperCase()) + '</b><br>Originality firewall</div></div></div>';
+  html += '<div class="report-card"><div class="kicker">Originality Firewall</div><h4>' + escapeHtml(g.passed ? 'Machine checks passed' : 'Regeneration required') + '</h4><p>' + escapeHtml(g.reason) + ' Overlap: ' + g.overlapPercent + '%. Longest shared phrase: ' + g.longestSharedPhraseWords + ' words.</p></div>';
+  if (s.titles && s.titles.length) { html += '<div class="report-card" style="margin-top:12px;"><div class="kicker">Six title directions</div>'; for (var i = 0; i < s.titles.length; i++) html += '<div style="padding:8px 0;border-top:1px solid #e0e7ff;"><b>' + escapeHtml(s.titles[i].text) + '</b> <span class="muted-lo">' + s.titles[i].length + ' chars · ' + (s.titles[i].fits ? 'fits' : 'revise length') + '</span><div class="muted-lo">' + escapeHtml(s.titles[i].mechanism) + '</div></div>'; html += '</div>'; }
+  if (s.thumbnail) html += '<div class="report-grid"><div class="report-card"><div class="kicker">Thumbnail system</div><h4>' + escapeHtml(s.thumbnail.overlayText || 'No overlay') + '</h4><p>' + escapeHtml(s.thumbnail.concept || '') + '</p><p>' + escapeHtml(s.thumbnail.composition || '') + '</p></div><div class="report-card"><div class="kicker">Ready image prompt</div><p>' + escapeHtml(s.thumbnail.imagePrompt || '') + '</p></div></div>';
+  if (s.script && s.script.beats) { html += '<div class="report-card"><div class="kicker">Timed script blueprint · ' + Math.round((s.script.runtimeSeconds || 0) / 60) + ' min</div>'; for (var b = 0; b < s.script.beats.length; b++) html += '<div style="padding:8px 0;border-top:1px solid #e0e7ff;"><b>' + escapeHtml(s.script.beats[b].label) + ' · ' + s.script.beats[b].seconds + ' sec</b><p>' + escapeHtml(s.script.beats[b].purpose) + '</p><span class="muted-lo">Retention: ' + escapeHtml(s.script.beats[b].retentionMove) + '</span></div>'; html += '</div>'; }
+  html += '<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn btn-ghost" id="btn-copy-remix-output" type="button">Copy production pack</button></div>'; el('remix-studio-output').innerHTML = html; el('remix-studio-status').className = 'status-line status-ok'; el('remix-studio-status').textContent = 'Production pack generated from the abstract pattern.';
+  el('btn-copy-remix-output').addEventListener('click', function () { if (navigator.clipboard) navigator.clipboard.writeText(el('remix-studio-output').innerText); this.textContent = 'Copied!'; });
+}
+
+window.addEventListener('message', function (event) { if (event.source !== window || !event.data || event.data.type !== 'NICHEFORGE_TUBEREMIX_HANDOFF') return; var p = event.data.payload || {}; LAST_REMIX_SOURCE = { sourceTitle: p.title || '', sourceTranscript: p.transcript || '', pattern: p.analysis || p.pattern || {}, topic: p.topic || p.title || '' }; openRemixStudio(LAST_REMIX_SOURCE); });
 
 // ---- Reports module ---------------------------------------------------
 

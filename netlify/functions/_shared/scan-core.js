@@ -11,11 +11,13 @@ const { getStore } = require('@netlify/blobs');
 
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const EVIDENCE_START_ISO = '2026-01-01T00:00:00.000Z';
+const CACHE_SCHEMA_VERSION = '2026-only-v1';
 
 function normalizeQueryKey(query) {
   // URL-encoded because raw spaces in a Blobs key have shown a mismatch
   // between what list() reports and what get() returns for that same key.
-  return encodeURIComponent(String(query).trim().toLowerCase().replace(/\s+/g, ' '));
+  return CACHE_SCHEMA_VERSION + '::' + encodeURIComponent(String(query).trim().toLowerCase().replace(/\s+/g, ' '));
 }
 
 async function getCachedEvidence(query) {
@@ -363,7 +365,7 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
     }
   }
 
-  const publishedAfter = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  const publishedAfter = EVIDENCE_START_ISO;
 
   const searchUrl =
     YT_BASE +
@@ -405,7 +407,9 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
       : null;
   });
 
-  const videos = (videosRes.data.items || []).map(function (v) {
+  const videos = (videosRes.data.items || []).filter(function (v) {
+    return v.snippet && new Date(v.snippet.publishedAt).getTime() >= new Date(EVIDENCE_START_ISO).getTime();
+  }).map(function (v) {
     return {
       id: v.id,
       title: v.snippet.title,
@@ -520,9 +524,11 @@ async function gatherYoutubeEvidence(query, ytKey, ytKeySource, skipCache) {
     topComments: topComments,
     autocompleteSuggestions: autocompleteSuggestions,
     scoreHistory: scoreHistory,
-    dataSource: 'YouTube Data API v3 (search.list, videos.list, channels.list, commentThreads.list) plus YouTube\u2019s public autocomplete endpoint — videos published in the last 12 months, ordered by view count.',
+    dataSource: 'YouTube Data API v3 plus YouTube\u2019s public autocomplete endpoint — only videos published on or after January 1, 2026.',
     youtubeKeySource: ytKeySource,
     fetchedAt: new Date().toISOString(),
+    evidenceStartDate: EVIDENCE_START_ISO,
+    freshnessPolicy: '2026-only',
     fromCache: false
   };
 
@@ -637,7 +643,7 @@ function buildUserPrompt(query, evidence) {
 
   return (
     'TOPIC: ' + query + '\n\n' +
-    'REAL YOUTUBE EVIDENCE (last 12 months, ordered by view count):\n' +
+    'REAL YOUTUBE EVIDENCE (published on or after January 1, 2026, ordered by view count):\n' +
     '- Videos sampled: ' + evidence.videoCount + '\n' +
     '- Average views: ' + evidence.avgViews + '\n' +
     '- Median views: ' + evidence.medianViews + '\n' +
@@ -904,5 +910,6 @@ module.exports = {
   normalizeCustomWeights: normalizeCustomWeights,
   SCORE_WEIGHTS: SCORE_WEIGHTS,
   YT_BASE: YT_BASE,
+  EVIDENCE_START_ISO: EVIDENCE_START_ISO,
   fetchJson: fetchJson
 };

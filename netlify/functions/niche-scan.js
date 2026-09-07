@@ -115,7 +115,7 @@ exports.handler = async function (event) {
     return http.fail(
       200,
       'no_results',
-      'YouTube returned no videos published in the last 12 months for "' + query + '".',
+      'YouTube returned no videos published in 2026 for "' + query + '".',
       'Try a broader or differently-worded topic — very new or extremely narrow phrases sometimes return nothing.'
     );
   }

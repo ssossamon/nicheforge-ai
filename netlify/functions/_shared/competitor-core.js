@@ -158,9 +158,10 @@ async function runCompetitorAnalysis(provider, apiKey, model, business, competit
   const systemPrompt =
     'You are a senior competitive intelligence and market strategy analyst. You are given a business description and ' +
     'the REAL, ACTUALLY-FETCHED homepage/pricing-page text of one or more named competitors. Use two kinds of input: ' +
+    'January 1, 2026 is the evidence floor. Do not introduce events, statistics, trends, or competitor facts from before 2026. ' +
     '(1) the real fetched competitor text — ground positioning, visible pricing, and messaging in that text specifically, ' +
     'and say "not visible on page" rather than invent a price or stat the page doesn\u2019t show; ' +
-    '(2) your own broad market/industry knowledge and analytical judgment for everything the page text can\u2019t tell you ' +
+    '(2) only current 2026 market/industry knowledge and analytical judgment for what the page text can\u2019t tell you ' +
     '(market trends, TAM, search volume, keyword difficulty, go-to-market strategy, scoring) — this is expected, ' +
     'labeled analysis and estimation, not a claim of verified fact. Be specific and data-driven throughout. ' +
     'Respond with STRICT JSON only, no markdown fences, matching exactly:\n\n' +
@@ -194,7 +195,7 @@ async function runCompetitorAnalysis(provider, apiKey, model, business, competit
   const competitorBlocks = competitorPages
     .map(function (c, i) {
       if (!c.fetched) {
-        return (i + 1) + '. ' + c.name + ' (' + c.url + ') \u2014 COULD NOT BE FETCHED (' + c.error + '). Analyze from general market knowledge of this competitor if you recognize them, otherwise note the gap.';
+        return (i + 1) + '. ' + c.name + ' (' + c.url + ') \u2014 COULD NOT BE FETCHED (' + c.error + '). Use only knowledge you can place in 2026; otherwise note the evidence gap.';
       }
       return (
         (i + 1) + '. ' + c.name + ' (' + c.url + ')\n' +

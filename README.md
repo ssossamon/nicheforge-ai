@@ -1,9 +1,13 @@
-# NicheForge AI (v2.9)
+# NicheForge AI (v3.0)
 
 Real YouTube search data + your own AI provider (BYOK) → ranked content/niche
 opportunities, a content gap callout, and video title ideas for video and
 content marketers. Built for lead-list growth: every free scan requires an
 email, which is synced to ConvertKit and stored as a backup lead record.
+
+## v3.0 — Evidence-to-Production Intelligence
+
+All platform evidence is restricted to content published on or after January 1, 2026. v3.0 adds Creator DNA, a Pattern-to-Production Studio, code-enforced title and thumbnail limits, Transferability scoring, an Originality Firewall, timed script blueprints, and an explicit one-click Tube Remix companion handoff.
 
 ## v2.9 — Automatic Gamma-style reports
 

@@ -113,7 +113,7 @@ exports.handler = async function (event) {
           success: false,
           error: {
             code: 'no_results',
-            message: 'No videos found for "' + q + '" in the last 12 months.',
+            message: 'No videos published in 2026 were found for "' + q + '".',
             whatToDoNext: 'Try a broader phrasing.'
           }
         });
